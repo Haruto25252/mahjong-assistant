@@ -76,4 +76,4 @@ MIT License
 
 ---
 
-© 2025 [Haruto25252](https://github.com/Haruto25252)
+© 2026 [Haruto25252](https://github.com/Haruto25252)
