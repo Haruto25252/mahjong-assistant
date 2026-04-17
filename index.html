@@ -2000,7 +2000,7 @@ function declareRiichi() {
   if (p.score < 1000) { showNotification('点数が足りません'); return; }
   if (!G.tsumoTile) { showNotification('ツモ牌がありません'); return; }
   const sh13 = calcShanten([...p.hand]);
-  if (sh13 > 0) { showNotification('テンパイしていません'); return; }
+  if (sh13 !== -1) { showNotification('テンパイしていません'); return; }
   G.pendingRiichi = true;
   showNotification('ツモ牌を捨ててリーチ確定！');
   updateUI();
@@ -2072,16 +2072,14 @@ function updateUI() {
 function renderPlayerHand() {
   const p = G.players[0];
   const hand = sortTiles(p.hand);
-  const tsumo = G.tsumoTile;
-  const fullHand = tsumo ? [...hand, tsumo] : [...hand];
-  const sh = calcShanten(fullHand);
+  const sh = calcShanten([...p.hand]);
 
   let html = '';
   for (const t of hand) html += renderTile(t, 'lg', '');
   if (tsumo) html += renderTile(tsumo, 'lg', G.pendingRiichi ? 'tsumo pending-riichi' : 'tsumo');
   document.getElementById('playerHand').innerHTML = html;
 
-  document.getElementById('tenpaiIndicator').classList.toggle('hidden', sh > 0);
+  document.getElementById('tenpaiIndicator').classList.toggle('hidden', sh !== -1);
   document.getElementById('riichiIndicator').classList.toggle('hidden', !p.riichi);
   document.getElementById('playerDiscard').innerHTML = p.discards.map(t=>renderSmallTile(t,'sm')).join('');
   document.getElementById('playerScore').textContent = p.score.toLocaleString() + '点';
@@ -2129,7 +2127,7 @@ function renderActionButtons() {
   const agari = isPlayerTurn && getPlayerHand(0).length === 14 && checkAgari(getPlayerHand(0));
   const sh13 = isPlayerTurn ? calcShanten([...p.hand]) : 99;
   const showTsumo = isPlayerTurn && !!agari;
-  const showRiichi = isPlayerTurn && sh13 <= 0 && !p.riichi && !G.pendingRiichi && p.score >= 1000 && !!G.tsumoTile;
+  const showRiichi = isPlayerTurn && sh13 === -1 && !p.riichi && !G.pendingRiichi && p.score >= 1000 && !!G.tsumoTile;
 
   const show = (id, visible) => {
     const el = document.getElementById(id);
@@ -2248,7 +2246,7 @@ function renderCandidates() {
   const candidates = analyzeCandidates(0);
   list.innerHTML = candidates.map((c, i) => {
     const isBest = i === 0;
-    const shantenText = c.shanten===-1?'<span style="color:#2ecc71">アガリ</span>':c.shanten===0?'<span style="color:#f39c12">テンパイ</span>':`${c.shanten}シャンテン`;
+    const shantenText = c.shanten===-1?'<span style="color:#f39c12">テンパイ</span>':c.shanten===0?'1シャンテン':`${c.shanten+1}シャンテン`;
     const d = c.display;
     return `<div class="candidate-item ${isBest?'best':''}" onclick="highlightCandidate(${c.tile.id})">
       <div class="candidate-rank ${isBest?'best':''}">${isBest?'★':i+1}</div>
@@ -2444,8 +2442,8 @@ function showCandidateDetail(tileId, event) {
   const sh = calcShanten(remaining);
   const d = tileDisplay(tile);
 
-  const shantenColor = sh === -1 ? '#2ecc71' : sh === 0 ? '#f39c12' : 'var(--ivory)';
-  const shantenLabel = sh === -1 ? 'アガリ形' : sh === 0 ? 'テンパイ' : `${sh}シャンテン`;
+  const shantenColor = sh === -1 ? '#f39c12' : 'var(--ivory)';
+  const shantenLabel = sh === -1 ? 'テンパイ' : sh === 0 ? '1シャンテン' : `${sh + 1}シャンテン`;
 
   const handHTML = `<div class="detail-section">
     <div class="detail-title">捨てた後の手牌</div>
@@ -2461,7 +2459,7 @@ function showCandidateDetail(tileId, event) {
 
   let tenpaiHTML = '';
 
-  if (sh === 0) {
+  if (sh === -1) {
     const waits = [];
     for (const suit of ['man', 'pin', 'sou']) {
       for (let n = 1; n <= 9; n++) {
