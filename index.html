@@ -451,12 +451,13 @@ body.layout-mobile .cpu-tile-back { width:12px; height:17px; }
 /* ===== TILES ===== */
 .tile {
   display:inline-block;
-  background: linear-gradient(145deg,#faf6ee,#ece4d4) center/100% 100% no-repeat;
+  background-color:#faf6ee;
   background-size:100% 100%;
-  border-radius:3px;
+  background-repeat:no-repeat;
+  border:1px solid #c8b89a; border-radius:3px;
   box-shadow:2px 2px 0px rgba(0,0,0,0.3);
   cursor:pointer; transition:transform 0.15s, box-shadow 0.15s;
-  position:relative; user-select:none; vertical-align:middle;
+  position:relative; user-select:none; vertical-align:bottom;
 }
 
 .tile:hover { transform:translateY(-4px); }
