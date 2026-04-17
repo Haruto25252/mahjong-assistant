@@ -625,6 +625,37 @@ body.layout-mobile .action-btn {
   cursor:pointer; border-radius:2px; transition:all 0.15s;
 }
 .candidate-detail-btn:hover { background:rgba(200,168,75,0.15); color:var(--gold); }
+.candidate-discard-btn {
+  font-size:0.62rem; padding:3px 8px;
+  border:1px solid rgba(46,204,113,0.5);
+  background:rgba(46,204,113,0.08); color:rgba(46,204,113,0.9);
+  cursor:pointer; border-radius:2px; transition:all 0.15s; white-space:nowrap;
+}
+.candidate-discard-btn:hover { background:rgba(46,204,113,0.25); color:#2ecc71; }
+
+/* Wait analysis */
+.wait-analysis { display:flex; flex-direction:column; gap:8px; }
+.wait-analysis-item {
+  background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:6px; padding:8px 10px;
+}
+.wait-analysis-header { display:flex; align-items:center; gap:8px; margin-bottom:5px; }
+.wait-analysis-score { flex:1; }
+.wait-han-label { font-size:0.75rem; color:var(--gold); font-weight:700; }
+.wait-pts { font-size:0.75rem; color:#2ecc71; margin-left:8px; }
+.wait-no-yaku { font-size:0.72rem; color:rgba(232,224,208,0.4); margin-left:8px; }
+.wait-yaku-list { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:6px; }
+.wait-yaku-tag {
+  font-size:0.62rem; padding:2px 5px;
+  background:rgba(200,168,75,0.15);
+  border:1px solid rgba(200,168,75,0.3);
+  border-radius:2px; color:rgba(200,168,75,0.9);
+}
+.decomp-display { display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
+.decomp-group { display:flex; flex-direction:column; align-items:center; gap:2px; }
+.decomp-group-label { font-size:0.58rem; color:rgba(232,224,208,0.4); }
+.decomp-tiles { display:flex; gap:1px; }
 
 /* Log */
 .log-list {
@@ -2059,6 +2090,7 @@ function renderCandidates() {
         <div class="candidate-yaku">${c.yaku.map(y=>y.name).join('・')||'役なし'}</div>
       </div>
       <button class="candidate-detail-btn" onclick="showCandidateDetail(${c.tile.id},event)">詳細</button>
+      <button class="candidate-discard-btn" onclick="event.stopPropagation();discardTile(getTileById(${c.tile.id}))">捨てる</button>
     </div>`;
   }).join('');
 }
@@ -2101,50 +2133,146 @@ function showResultModal(hand, yaku, han, fu, type, loser) {
   </div>`);
 }
 
+function tryFormMentsuGroups(tiles) {
+  if (tiles.length === 0) return [];
+  const sorted = sortTiles(tiles);
+  const t = sorted[0];
+  const kouIndices = [];
+  for (let i = 0; i < sorted.length && kouIndices.length < 3; i++) {
+    if (tileKey(sorted[i]) === tileKey(t)) kouIndices.push(i);
+  }
+  if (kouIndices.length >= 3) {
+    const kouSet = new Set(kouIndices);
+    const rest = sorted.filter((_, i) => !kouSet.has(i));
+    const result = tryFormMentsuGroups(rest);
+    if (result !== null) return [{ type: 'kou', tiles: kouIndices.map(i => sorted[i]) }, ...result];
+  }
+  if (t.suit !== 'jihai' && t.num <= 7) {
+    const i1 = 0;
+    const i2 = sorted.findIndex(x => x.suit === t.suit && x.num === t.num + 1);
+    const i3 = sorted.findIndex(x => x.suit === t.suit && x.num === t.num + 2);
+    if (i2 >= 0 && i3 >= 0) {
+      const junSet = new Set([i1, i2, i3]);
+      const rest = sorted.filter((_, i) => !junSet.has(i));
+      const result = tryFormMentsuGroups(rest);
+      if (result !== null) return [{ type: 'jun', tiles: [sorted[i1], sorted[i2], sorted[i3]] }, ...result];
+    }
+  }
+  return null;
+}
+
+function tryDecomposeNormal(tiles) {
+  const sorted = sortTiles(tiles);
+  const tried = new Set();
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const k = tileKey(sorted[i]);
+    if (tried.has(k)) continue;
+    tried.add(k);
+    if (tileKey(sorted[i]) !== tileKey(sorted[i + 1])) continue;
+    const rest = sorted.filter((_, j) => j !== i && j !== i + 1);
+    const mentsu = tryFormMentsuGroups(rest);
+    if (mentsu !== null) return { type: 'normal', jantai: [sorted[i], sorted[i + 1]], mentsu };
+  }
+  return null;
+}
+
+function renderDecomposition(decomp) {
+  if (!decomp) return '';
+  const tileXS = t => { const d = tileDisplay(t); return `<div class="tile tile-xs"><span class="${d.color}">${d.text}</span></div>`; };
+  if (decomp.type === 'kokushi') return '<div style="font-size:0.7rem;color:rgba(232,224,208,0.5)">国士無双</div>';
+  if (decomp.type === 'chiitoitsu') {
+    return `<div class="decomp-display">${decomp.pairs.map(pair =>
+      `<div class="decomp-group"><div class="decomp-tiles">${pair.map(tileXS).join('')}</div><div class="decomp-group-label">対子</div></div>`
+    ).join('')}</div>`;
+  }
+  return `<div class="decomp-display">
+    <div class="decomp-group"><div class="decomp-tiles">${decomp.jantai.map(tileXS).join('')}</div><div class="decomp-group-label">雀頭</div></div>
+    ${decomp.mentsu.map(m =>
+      `<div class="decomp-group"><div class="decomp-tiles">${m.tiles.map(tileXS).join('')}</div><div class="decomp-group-label">${m.type === 'kou' ? '刻子' : '順子'}</div></div>`
+    ).join('')}
+  </div>`;
+}
+
 function showCandidateDetail(tileId, event) {
   event.stopPropagation();
   const fullHand = getPlayerHand(0);
-  const tile = fullHand.find(t => t.id === tileId);
+  const tile = fullHand.find(t => t.id === Number(tileId));
   if (!tile) return;
-  const remaining = fullHand.filter(t => t.id !== tileId);
+  const remaining = fullHand.filter(t => t.id !== tile.id);
   const sh = calcShanten(remaining);
   const d = tileDisplay(tile);
 
-  let waitInfo = '';
+  const shantenColor = sh === -1 ? '#2ecc71' : sh === 0 ? '#f39c12' : 'var(--ivory)';
+  const shantenLabel = sh === -1 ? 'アガリ形' : sh === 0 ? 'テンパイ' : `${sh}シャンテン`;
+
+  const handHTML = `<div class="detail-section">
+    <div class="detail-title">捨てた後の手牌</div>
+    <div class="hand-example">${sortTiles(remaining).map(t => { const rd = tileDisplay(t); return `<div class="tile tile-sm"><span class="${rd.color}">${rd.text}</span></div>`; }).join('')}</div>
+  </div>`;
+
+  const shantenHTML = `<div class="detail-section">
+    <div class="detail-title">シャンテン数</div>
+    <p style="color:${shantenColor};font-size:1.1rem;font-weight:700;">${shantenLabel}</p>
+  </div>`;
+
+  let tenpaiHTML = '';
+
   if (sh === 0) {
     const waits = [];
-    const allKeys = [];
-    for (const suit of ['man','pin','sou']) for (let n = 1; n <= 9; n++) allKeys.push({suit,num:n});
-    for (let n = 1; n <= 7; n++) allKeys.push({suit:'jihai',num:n});
-    for (const key of allKeys) {
-      const testHand = [...remaining, {...key, id:9999}];
-      if (testHand.length === 14 && checkAgari(testHand)) waits.push(key);
+    for (const suit of ['man', 'pin', 'sou']) {
+      for (let n = 1; n <= 9; n++) {
+        const testHand = [...remaining, { suit, num: n, id: 9999 }];
+        if (checkAgari(testHand)) waits.push({ suit, num: n });
+      }
     }
+    for (let n = 1; n <= 7; n++) {
+      const testHand = [...remaining, { suit: 'jihai', num: n, id: 9999 }];
+      if (checkAgari(testHand)) waits.push({ suit: 'jihai', num: n });
+    }
+
     if (waits.length > 0) {
-      waitInfo = `<div class="detail-section"><div class="detail-title">待ち牌</div>
-        <div style="display:flex;gap:3px;flex-wrap:wrap;">${waits.map(w=>{const wd=tileDisplay(w);return`<div class="tile tile-sm"><span class="${wd.color}">${wd.text}</span></div>`;}).join('')}</div></div>`;
+      const baseCtx = getPlayerContext(0);
+      const waitDetails = waits.map(w => {
+        const completeHand = [...remaining, { ...w, id: 9999 }];
+        const ctx = { ...baseCtx, tsumo: true };
+        const yakuList = detectYaku(completeHand, G.players[0], ctx);
+        const fu = calcFu(completeHand, ctx);
+        const scoreInfo = calcScore(yakuList, fu, 0);
+        const totalHan = yakuList.reduce((s, y) => s + y.han, 0);
+        const pts = Math.ceil(scoreInfo.basicPoints * 4 / 100) * 100;
+        const hanLabel = scoreInfo.yakuman ? '役満' : totalHan >= 11 ? '三倍満' : totalHan >= 8 ? '倍満' : totalHan >= 6 ? '跳満' : totalHan >= 5 ? '満貫' : totalHan > 0 ? `${totalHan}翻${fu}符` : '';
+        const sorted14 = sortTiles(completeHand);
+        const decomp = isChiitoitsu(sorted14) ? (() => {
+          const seen = {}; for (const t of sorted14) { const k = tileKey(t); if (!seen[k]) seen[k] = []; seen[k].push(t); }
+          return { type: 'chiitoitsu', pairs: Object.values(seen) };
+        })() : isKokushi(sorted14) ? { type: 'kokushi' } : tryDecomposeNormal(completeHand);
+        const wd = tileDisplay(w);
+        return { display: wd, yakuList, fu, totalHan, pts, hanLabel, decomp };
+      });
+
+      tenpaiHTML = `<div class="detail-section">
+        <div class="detail-title">待ち牌と上がり分析（ツモ）</div>
+        <div class="wait-analysis">${waitDetails.map(wd => `
+          <div class="wait-analysis-item">
+            <div class="wait-analysis-header">
+              <div class="tile tile-sm"><span class="${wd.display.color}">${wd.display.text}</span></div>
+              <div class="wait-analysis-score">
+                ${wd.yakuList.length > 0
+                  ? `<span class="wait-han-label">${wd.hanLabel}</span><span class="wait-pts">+${wd.pts.toLocaleString()}点</span>`
+                  : '<span class="wait-no-yaku">役なし（アガれません）</span>'}
+              </div>
+            </div>
+            ${wd.yakuList.length > 0
+              ? `<div class="wait-yaku-list">${wd.yakuList.map(y => `<span class="wait-yaku-tag">${y.name}（${y.han >= 13 ? '役満' : y.han + '翻'}）</span>`).join('')}</div>`
+              : ''}
+            ${renderDecomposition(wd.decomp)}
+          </div>`).join('')}
+        </div>
+      </div>`;
     }
   }
 
-  const context = getPlayerContext(0);
-  const yaku = sh === -1 ? detectYaku(remaining, G.players[0], context) : [];
-
-  showModal(`捨て牌分析: ${d.text}`, `
-    <div class="detail-section">
-      <div class="detail-title">捨てた後の手牌</div>
-      <div class="hand-example">${sortTiles(remaining).map(t=>{const rd=tileDisplay(t);return`<div class="tile tile-sm"><span class="${rd.color}">${rd.text}</span></div>`;}).join('')}</div>
-    </div>
-    <div class="detail-section">
-      <div class="detail-title">シャンテン数</div>
-      <p style="color:${sh===-1?'#2ecc71':sh===0?'#f39c12':'var(--ivory)'};font-size:1.1rem;font-weight:700;">
-        ${sh===-1?'アガリ形':sh===0?'テンパイ':`${sh}シャンテン`}</p>
-    </div>
-    ${waitInfo}
-    ${yaku.length>0?`<div class="detail-section"><div class="detail-title">成立する役</div>
-      ${yaku.map(y=>`<div style="display:flex;justify-content:space-between;padding:5px 9px;background:rgba(255,255,255,0.05);border-radius:4px;margin-bottom:3px;">
-        <span>${y.name}</span><span style="color:var(--gold)">${y.han}翻</span></div>`).join('')}
-    </div>`:''}
-  `);
+  showModal(`捨て牌分析: ${d.text}`, handHTML + shantenHTML + tenpaiHTML);
 }
 
 // ============================================================
