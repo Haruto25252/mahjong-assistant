@@ -1,0 +1,2286 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>麻雀アシスタント</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700;900&family=Zen+Antique&display=swap');
+
+:root {
+  --green: #1a4a2e;
+  --green-light: #2d6e47;
+  --green-felt: #1e5c38;
+  --gold: #c8a84b;
+  --ivory: #f5f0e8;
+  --panel-bg: rgba(10,30,20,0.9);
+  --text-light: #e8e0d0;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  font-family: 'Noto Serif JP', serif;
+  background: var(--green);
+  color: var(--text-light);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+body::before {
+  content:'';
+  position:fixed; inset:0;
+  background-image:
+    repeating-linear-gradient(45deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px),
+    repeating-linear-gradient(-45deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px);
+  pointer-events:none; z-index:0;
+}
+
+/* ===== LAYOUT SELECTOR (startup screen) ===== */
+#layoutSelector {
+  position:fixed; inset:0; z-index:1000;
+  background: radial-gradient(ellipse at center, #1e5c38 0%, #0d2518 100%);
+  display:flex; align-items:center; justify-content:center;
+  flex-direction:column; gap:32px;
+}
+
+.ls-title {
+  font-family:'Zen Antique',serif;
+  font-size:2.5rem; color:var(--gold);
+  text-shadow:0 0 40px rgba(200,168,75,0.7);
+  letter-spacing:0.2em; text-align:center;
+}
+
+.ls-subtitle {
+  font-size:0.9rem; color:rgba(232,224,208,0.6);
+  letter-spacing:0.1em; text-align:center;
+}
+
+.ls-options {
+  display:flex; gap:24px; flex-wrap:wrap; justify-content:center;
+}
+
+.ls-btn {
+  width:160px; padding:28px 20px;
+  background:rgba(0,0,0,0.3);
+  border:2px solid rgba(200,168,75,0.4);
+  border-radius:12px; cursor:pointer;
+  display:flex; flex-direction:column; align-items:center; gap:12px;
+  transition:all 0.25s; color:var(--text-light);
+}
+
+.ls-btn:hover {
+  border-color:var(--gold);
+  background:rgba(200,168,75,0.1);
+  transform:translateY(-4px);
+  box-shadow:0 8px 30px rgba(0,0,0,0.4);
+}
+
+.ls-btn-icon { font-size:3rem; }
+.ls-btn-label { font-family:'Zen Antique',serif; font-size:1rem; color:var(--gold); }
+.ls-btn-desc { font-size:0.72rem; color:rgba(232,224,208,0.5); text-align:center; }
+
+/* ===== HEADER ===== */
+header {
+  background:linear-gradient(180deg,rgba(0,0,0,0.6) 0%,transparent 100%);
+  padding:10px 14px;
+  display:flex; align-items:center; justify-content:space-between;
+  position:relative; z-index:10;
+  border-bottom:1px solid rgba(200,168,75,0.3);
+  gap:8px;
+}
+
+.header-left {
+  display:flex; align-items:center; gap:10px;
+}
+
+.logo {
+  font-family:'Zen Antique',serif;
+  font-size:1.4rem; color:var(--gold);
+  text-shadow:0 0 20px rgba(200,168,75,0.5);
+  letter-spacing:0.05em; white-space:nowrap;
+}
+
+/* Search button (always visible top-left area) */
+.search-fab {
+  width:38px; height:38px;
+  background:rgba(0,0,0,0.4);
+  border:1px solid rgba(200,168,75,0.5);
+  border-radius:50%; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  font-size:1.1rem; color:var(--gold);
+  transition:all 0.2s; flex-shrink:0;
+  user-select:none;
+}
+
+.search-fab:hover, .search-fab.active {
+  background:var(--gold); color:var(--green);
+  box-shadow:0 0 16px rgba(200,168,75,0.5);
+}
+
+.search-fab.active { animation:pulse-gold 1.5s infinite; }
+
+@keyframes pulse-gold {
+  0%,100%{box-shadow:0 0 8px rgba(200,168,75,0.5);}
+  50%{box-shadow:0 0 20px rgba(200,168,75,0.9);}
+}
+
+.header-right {
+  display:flex; align-items:center; gap:8px;
+}
+
+.btn {
+  padding:6px 12px;
+  border:1px solid var(--gold);
+  background:transparent; color:var(--gold);
+  font-family:'Noto Serif JP',serif;
+  font-size:0.78rem; cursor:pointer;
+  transition:all 0.2s; border-radius:3px; white-space:nowrap;
+}
+.btn:hover { background:var(--gold); color:var(--green); }
+.btn.active { background:var(--gold); color:var(--green); font-weight:700; }
+.btn-red { border-color:#e74c3c; color:#e74c3c; }
+.btn-red:hover { background:#e74c3c; color:white; }
+.btn-icon {
+  width:36px; height:36px; padding:0;
+  border:1px solid rgba(200,168,75,0.5);
+  background:rgba(0,0,0,0.3);
+  border-radius:4px; font-size:1rem;
+  display:flex; align-items:center; justify-content:center;
+}
+.btn-icon:hover { background:var(--gold); color:var(--green); }
+
+select {
+  padding:5px 8px;
+  background:rgba(0,0,0,0.5);
+  border:1px solid var(--gold); color:var(--gold);
+  font-family:'Noto Serif JP',serif; font-size:0.78rem;
+  border-radius:3px; cursor:pointer;
+}
+
+/* ===== SETTINGS PANEL ===== */
+#settingsPanel {
+  position:fixed; top:60px; right:14px; z-index:90;
+  background:#0d2518;
+  border:1px solid var(--gold);
+  border-radius:10px; width:280px;
+  box-shadow:0 8px 40px rgba(0,0,0,0.7);
+  animation:slideIn 0.2s ease-out;
+  overflow:hidden;
+}
+
+@keyframes slideIn {
+  from { opacity:0; transform:translateY(-10px); }
+  to { opacity:1; transform:translateY(0); }
+}
+
+.settings-header {
+  padding:12px 16px;
+  background:rgba(200,168,75,0.1);
+  border-bottom:1px solid rgba(200,168,75,0.2);
+  font-size:0.85rem; color:var(--gold);
+  letter-spacing:0.1em;
+  display:flex; justify-content:space-between; align-items:center;
+}
+
+.settings-body { padding:14px 16px; display:flex; flex-direction:column; gap:14px; }
+
+.settings-group { display:flex; flex-direction:column; gap:8px; }
+
+.settings-label {
+  font-size:0.7rem; color:rgba(200,168,75,0.6);
+  letter-spacing:0.15em; text-transform:uppercase;
+}
+
+.settings-row {
+  display:flex; gap:6px; flex-wrap:wrap;
+}
+
+.settings-select { width:100%; }
+
+.settings-divider {
+  height:1px; background:rgba(200,168,75,0.15); margin:2px 0;
+}
+
+/* ===== SEARCH MODE OVERLAY ===== */
+#searchModeOverlay {
+  position:fixed; inset:0; z-index:500;
+  cursor:text;
+  /* Subtle tint to indicate search mode */
+  background:rgba(200,168,75,0.04);
+  pointer-events:none;
+}
+
+#searchModeOverlay.active {
+  pointer-events:all;
+}
+
+.search-mode-banner {
+  position:fixed; top:60px; left:50%; transform:translateX(-50%);
+  background:rgba(200,168,75,0.95); color:#0d2518;
+  padding:8px 20px; border-radius:20px;
+  font-size:0.82rem; font-weight:700;
+  box-shadow:0 4px 20px rgba(0,0,0,0.4);
+  white-space:nowrap; letter-spacing:0.05em;
+  animation:slideDown 0.3s ease-out;
+  z-index:501; pointer-events:none;
+}
+
+@keyframes slideDown {
+  from{transform:translateX(-50%) translateY(-10px);opacity:0;}
+  to{transform:translateX(-50%) translateY(0);opacity:1;}
+}
+
+/* ===== SEARCH RESULT PANEL ===== */
+#searchPanel {
+  position:fixed; bottom:0; left:0; right:0;
+  max-height:55vh; z-index:600;
+  background:#0d2518;
+  border-top:2px solid var(--gold);
+  border-radius:16px 16px 0 0;
+  display:flex; flex-direction:column;
+  box-shadow:0 -8px 40px rgba(0,0,0,0.7);
+  animation:slideUp 0.3s ease-out;
+  overflow:hidden;
+}
+
+@keyframes slideUp {
+  from{transform:translateY(100%);}
+  to{transform:translateY(0);}
+}
+
+.sp-handle {
+  width:40px; height:4px;
+  background:rgba(200,168,75,0.4);
+  border-radius:2px; margin:10px auto 4px;
+  flex-shrink:0;
+}
+
+.sp-header {
+  padding:8px 16px 12px;
+  display:flex; align-items:center; gap:10px; flex-shrink:0;
+  border-bottom:1px solid rgba(200,168,75,0.2);
+}
+
+.sp-query {
+  flex:1; font-size:1rem; font-weight:700;
+  color:var(--gold); font-family:'Zen Antique',serif;
+}
+
+.sp-close {
+  background:none; border:1px solid rgba(200,168,75,0.4);
+  color:var(--gold); width:28px; height:28px;
+  border-radius:50%; cursor:pointer; font-size:1rem;
+  display:flex; align-items:center; justify-content:center;
+}
+.sp-close:hover { background:var(--gold); color:var(--green); }
+
+.sp-body {
+  flex:1; overflow-y:auto; padding:14px 16px;
+}
+
+.sp-body::-webkit-scrollbar{width:4px;}
+.sp-body::-webkit-scrollbar-thumb{background:rgba(200,168,75,0.3);border-radius:2px;}
+
+.sp-definition {
+  font-size:0.9rem; line-height:1.8;
+  color:var(--text-light); margin-bottom:16px;
+}
+
+.sp-definition strong { color:var(--gold); }
+
+.sp-reading {
+  font-size:0.75rem; color:rgba(200,168,75,0.6);
+  margin-bottom:8px; letter-spacing:0.1em;
+}
+
+.sp-notfound {
+  font-size:0.85rem; color:rgba(232,224,208,0.5); margin-bottom:16px;
+}
+
+.sp-web-section {
+  display:flex; flex-direction:column; gap:8px;
+  padding-top:12px; border-top:1px solid rgba(200,168,75,0.15);
+}
+
+.sp-web-label {
+  font-size:0.7rem; color:rgba(200,168,75,0.5); letter-spacing:0.1em;
+}
+
+.sp-web-btns { display:flex; gap:8px; flex-wrap:wrap; }
+
+.sp-web-btn {
+  padding:7px 14px;
+  border:1px solid rgba(200,168,75,0.4);
+  background:transparent; color:rgba(200,168,75,0.8);
+  font-family:'Noto Serif JP',serif; font-size:0.78rem;
+  border-radius:4px; cursor:pointer; transition:all 0.2s;
+  text-decoration:none; display:inline-block;
+}
+.sp-web-btn:hover { background:rgba(200,168,75,0.15); color:var(--gold); }
+
+/* ===== MAIN LAYOUT ===== */
+.main {
+  display:grid;
+  grid-template-columns:1fr 300px;
+  gap:12px; padding:12px;
+  position:relative; z-index:1;
+  min-height:calc(100vh - 62px);
+}
+
+/* MOBILE LAYOUT */
+body.layout-mobile .main {
+  grid-template-columns:1fr;
+  padding:8px;
+  gap:8px;
+}
+
+body.layout-mobile .side-panel {
+  display:none; /* hidden by default, toggled via bottom tabs */
+}
+
+body.layout-mobile .side-panel.mobile-visible {
+  display:flex;
+}
+
+/* Mobile tab bar */
+.mobile-tab-bar {
+  display:none;
+  position:sticky; bottom:0; z-index:20;
+  background:#0a1e10;
+  border-top:1px solid rgba(200,168,75,0.3);
+  padding:6px 0;
+}
+
+body.layout-mobile .mobile-tab-bar { display:flex; }
+
+.mob-tab {
+  flex:1; display:flex; flex-direction:column;
+  align-items:center; gap:3px;
+  padding:6px; cursor:pointer;
+  font-size:0.65rem; color:rgba(200,168,75,0.4);
+  border:none; background:transparent;
+  transition:color 0.15s;
+}
+.mob-tab.active { color:var(--gold); }
+.mob-tab-icon { font-size:1.3rem; }
+
+/* ===== GAME AREA ===== */
+.game-area { display:flex; flex-direction:column; gap:10px; }
+
+/* ===== TABLE ===== */
+.table {
+  background:var(--green-felt, #1e5c38);
+  border-radius:12px;
+  border:2px solid rgba(200,168,75,0.3);
+  padding:12px;
+  box-shadow:inset 0 0 60px rgba(0,0,0,0.3);
+  position:relative; overflow:hidden;
+}
+
+.table::before {
+  content:''; position:absolute; inset:8px;
+  border:1px solid rgba(200,168,75,0.12);
+  border-radius:8px; pointer-events:none;
+}
+
+/* CPU zone */
+.cpu-zone {
+  display:grid;
+  grid-template-areas:". top ." "left . right" ". . .";
+  grid-template-columns:1fr 1fr 1fr;
+  gap:5px; margin-bottom:8px;
+}
+
+.cpu-top{grid-area:top;}
+.cpu-left{grid-area:left;}
+.cpu-right{grid-area:right;}
+
+.cpu-player {
+  background:rgba(0,0,0,0.3);
+  border-radius:6px; padding:7px;
+  display:flex; flex-direction:column; align-items:center; gap:4px;
+  border:1px solid rgba(200,168,75,0.2);
+  min-width:0;
+}
+
+.cpu-name { font-size:0.72rem; color:var(--gold); }
+.cpu-score { font-size:0.75rem; color:var(--ivory); }
+
+.cpu-tiles { display:flex; gap:2px; flex-wrap:wrap; justify-content:center; }
+
+.cpu-tile-back {
+  width:16px; height:22px;
+  background:linear-gradient(135deg,#2a5a9a,#1a3a6e);
+  border-radius:2px; border:1px solid rgba(255,255,255,0.2);
+}
+
+/* mobile: smaller CPU tiles */
+body.layout-mobile .cpu-tile-back { width:12px; height:17px; }
+
+.discard-tiles { display:flex; flex-wrap:wrap; gap:2px; }
+
+/* Center */
+.table-center {
+  display:flex; justify-content:center; align-items:center;
+  padding:6px 0; gap:16px;
+}
+
+.wind-kanji {
+  font-family:'Zen Antique',serif;
+  font-size:2rem; color:var(--gold);
+  text-shadow:0 0 15px rgba(200,168,75,0.6);
+}
+
+.wind-label, .yama-label, .dora-label {
+  font-size:0.6rem; color:rgba(200,168,75,0.6); margin-top:2px; text-align:center;
+}
+
+.yama-count {
+  font-size:1.6rem; font-weight:900; color:var(--ivory); line-height:1; text-align:center;
+}
+
+.round-display {
+  font-family:'Zen Antique',serif;
+  font-size:0.85rem; color:rgba(200,168,75,0.8);
+  letter-spacing:0.1em; text-align:center;
+}
+
+.honba-display { font-size:0.65rem; color:rgba(232,224,208,0.5); text-align:center; }
+
+/* ===== TILES ===== */
+.tile {
+  display:inline-flex; align-items:center; justify-content:center;
+  background:linear-gradient(145deg,#faf6ee,#ece4d4);
+  border:1px solid #c8b89a; border-radius:3px;
+  box-shadow:2px 2px 0px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.8);
+  cursor:pointer; transition:transform 0.15s, box-shadow 0.15s;
+  position:relative; user-select:none;
+  font-family:'Zen Antique',serif;
+}
+
+.tile:hover { transform:translateY(-4px); }
+.tile.selected { transform:translateY(-8px); border-color:var(--gold); }
+.tile.tsumo { border-color:#5dade2; margin-left:8px; box-shadow:2px 2px 0 rgba(0,0,0,0.3), 0 0 8px rgba(93,173,226,0.5); }
+.tile.candidate-best { border-color:#2ecc71; box-shadow:2px 2px 0 rgba(0,0,0,0.3), 0 0 10px rgba(46,204,113,0.7); }
+
+.tile-lg { width:42px; height:58px; font-size:1.5rem; }
+.tile-md { width:32px; height:44px; font-size:1.1rem; }
+.tile-sm { width:22px; height:30px; font-size:0.75rem; }
+.tile-xs { width:16px; height:22px; font-size:0.6rem; }
+
+/* Mobile tile sizes */
+body.layout-mobile .tile-lg { width:34px; height:48px; font-size:1.2rem; }
+body.layout-mobile .tile-md { width:26px; height:36px; font-size:0.9rem; }
+
+.man{color:#c0392b;} .pin{color:#1a5276;} .sou{color:#1e8449;}
+.jihai{color:#2c3e50;} .haku{color:#2c3e50;font-weight:900;}
+.hatsu{color:#1e8449;font-weight:900;} .chun{color:#c0392b;font-weight:900;}
+
+/* Wind badge */
+.wind-badge {
+  background:var(--gold); color:var(--green);
+  font-size:0.65rem; padding:2px 5px;
+  border-radius:2px; font-weight:700;
+}
+
+.riichi-indicator {
+  display:inline-block; background:#e74c3c; color:white;
+  font-size:0.6rem; padding:1px 5px; border-radius:2px; font-weight:700;
+}
+
+.tenpai-badge {
+  display:inline-block;
+  background:rgba(46,204,113,0.15);
+  border:1px solid #2ecc71; color:#2ecc71;
+  font-size:0.65rem; padding:1px 6px; border-radius:2px; font-weight:700;
+  animation:pulse 1.5s infinite;
+}
+
+@keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.5;} }
+
+/* Player zone */
+.player-zone { margin-top:8px; }
+
+.player-info {
+  display:flex; justify-content:space-between; align-items:center;
+  margin-bottom:6px; padding:0 4px;
+  flex-wrap:wrap; gap:4px;
+}
+
+.player-name-display {
+  font-size:0.82rem; color:var(--gold);
+  display:flex; align-items:center; gap:6px; flex-wrap:wrap;
+}
+
+.player-score-display {
+  font-size:0.95rem; color:var(--ivory); font-weight:700;
+}
+
+.hand-container {
+  display:flex; align-items:flex-end; gap:3px; flex-wrap:wrap;
+}
+
+.discard-zone {
+  background:rgba(0,0,0,0.2); border-radius:5px;
+  padding:6px; margin-top:6px;
+}
+
+.discard-label {
+  font-size:0.6rem; color:rgba(232,224,208,0.5); margin-bottom:4px;
+}
+
+/* ===== ACTION BAR ===== */
+.action-bar {
+  display:flex; gap:6px; justify-content:center;
+  padding:8px; background:rgba(0,0,0,0.3);
+  border-radius:8px; flex-wrap:wrap;
+}
+
+.action-btn {
+  padding:9px 16px; border:2px solid;
+  background:transparent;
+  font-family:'Noto Serif JP',serif;
+  font-size:0.95rem; font-weight:700;
+  cursor:pointer; border-radius:4px;
+  transition:all 0.2s; letter-spacing:0.05em;
+}
+
+body.layout-mobile .action-btn {
+  padding:10px 12px; font-size:0.85rem; flex:1; min-width:60px;
+}
+
+.action-tsumo{border-color:#5dade2;color:#5dade2;}
+.action-tsumo:hover{background:#5dade2;color:#0a1a2e;}
+.action-ron{border-color:#e74c3c;color:#e74c3c;}
+.action-ron:hover{background:#e74c3c;color:white;}
+.action-chi{border-color:#f39c12;color:#f39c12;}
+.action-chi:hover{background:#f39c12;color:#1a1a1a;}
+.action-pon{border-color:#9b59b6;color:#9b59b6;}
+.action-pon:hover{background:#9b59b6;color:white;}
+.action-kan{border-color:#1abc9c;color:#1abc9c;}
+.action-kan:hover{background:#1abc9c;color:white;}
+.action-riichi{border-color:var(--gold);color:var(--gold);}
+.action-riichi:hover{background:var(--gold);color:var(--green);}
+.action-skip{border-color:rgba(232,224,208,0.4);color:rgba(232,224,208,0.4);}
+.action-skip:hover{background:rgba(232,224,208,0.1);}
+.action-btn:disabled{opacity:0.2;cursor:not-allowed;pointer-events:none;}
+
+/* Status */
+.status-msg {
+  text-align:center; font-size:0.82rem;
+  color:rgba(232,224,208,0.7); padding:5px; min-height:26px;
+}
+
+/* ===== SIDE PANEL ===== */
+.side-panel { display:flex; flex-direction:column; gap:10px; }
+
+.panel {
+  background:var(--panel-bg);
+  border:1px solid rgba(200,168,75,0.25);
+  border-radius:8px; overflow:hidden;
+  backdrop-filter:blur(4px);
+}
+
+.panel-header {
+  padding:7px 14px;
+  background:rgba(200,168,75,0.1);
+  border-bottom:1px solid rgba(200,168,75,0.2);
+  font-size:0.78rem; color:var(--gold);
+  letter-spacing:0.1em;
+  display:flex; justify-content:space-between; align-items:center;
+}
+
+.panel-body { padding:10px; }
+
+.score-row {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.05);
+  font-size:0.82rem;
+}
+.score-row:last-child{border-bottom:none;}
+.score-name { color:rgba(232,224,208,0.7); display:flex; align-items:center; gap:6px; }
+
+/* Candidates */
+.candidate-list { display:flex; flex-direction:column; gap:5px; }
+
+.candidate-item {
+  background:rgba(255,255,255,0.05);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:4px; padding:7px 9px;
+  cursor:pointer; transition:all 0.2s;
+  display:flex; align-items:center; gap:7px;
+}
+.candidate-item:hover { background:rgba(255,255,255,0.1); border-color:var(--gold); }
+.candidate-item.best { border-color:#2ecc71; background:rgba(46,204,113,0.05); }
+.candidate-rank { font-size:0.65rem; color:rgba(232,224,208,0.4); min-width:18px; }
+.candidate-rank.best { color:#2ecc71; }
+.candidate-info { flex:1; font-size:0.72rem; }
+.candidate-shanten { color:var(--gold); font-weight:700; }
+.candidate-yaku { color:rgba(232,224,208,0.6); margin-top:2px; }
+.candidate-detail-btn {
+  font-size:0.62rem; padding:3px 6px;
+  border:1px solid rgba(200,168,75,0.4);
+  background:transparent; color:rgba(200,168,75,0.7);
+  cursor:pointer; border-radius:2px; transition:all 0.15s;
+}
+.candidate-detail-btn:hover { background:rgba(200,168,75,0.15); color:var(--gold); }
+
+/* Log */
+.log-list {
+  max-height:110px; overflow-y:auto;
+  font-size:0.7rem; display:flex; flex-direction:column; gap:2px;
+}
+.log-list::-webkit-scrollbar{width:3px;}
+.log-list::-webkit-scrollbar-thumb{background:rgba(200,168,75,0.3);border-radius:1px;}
+.log-item{padding:2px 5px;border-radius:2px;color:rgba(232,224,208,0.7);line-height:1.4;}
+.log-item.system{color:var(--gold);}
+.log-item.win{color:#2ecc71;font-weight:700;}
+.log-item.riichi{color:#9b59b6;}
+
+/* ===== MODAL ===== */
+.modal-overlay {
+  position:fixed; inset:0;
+  background:rgba(0,0,0,0.8); z-index:300;
+  display:flex; align-items:center; justify-content:center;
+  padding:16px; backdrop-filter:blur(4px);
+}
+
+.modal {
+  background:#0d2518;
+  border:1px solid var(--gold);
+  border-radius:10px;
+  max-width:680px; width:100%;
+  max-height:88vh; overflow-y:auto;
+  box-shadow:0 20px 60px rgba(0,0,0,0.8);
+}
+.modal::-webkit-scrollbar{width:5px;}
+.modal::-webkit-scrollbar-thumb{background:rgba(200,168,75,0.3);border-radius:2px;}
+
+.modal-header {
+  padding:14px 18px;
+  border-bottom:1px solid rgba(200,168,75,0.3);
+  display:flex; justify-content:space-between; align-items:center;
+  position:sticky; top:0; background:#0d2518; z-index:1;
+}
+
+.modal-title { font-family:'Zen Antique',serif; font-size:1.1rem; color:var(--gold); }
+
+.modal-close {
+  background:none; border:1px solid rgba(200,168,75,0.4);
+  color:var(--gold); font-size:1.1rem; cursor:pointer;
+  width:28px; height:28px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  transition:all 0.2s;
+}
+.modal-close:hover{background:var(--gold);color:var(--green);}
+.modal-body{padding:18px;}
+
+/* Yaku list */
+.yaku-category{margin-bottom:18px;}
+.yaku-cat-title{
+  font-size:0.72rem;color:rgba(200,168,75,0.6);
+  letter-spacing:0.15em;margin-bottom:8px;
+  padding-bottom:5px;border-bottom:1px solid rgba(200,168,75,0.2);
+}
+.yaku-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:7px;}
+.yaku-card{
+  background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);
+  border-radius:5px;padding:9px;transition:all 0.2s;cursor:pointer;
+}
+.yaku-card:hover{background:rgba(200,168,75,0.08);border-color:rgba(200,168,75,0.3);}
+.yaku-name{font-size:0.88rem;color:var(--ivory);margin-bottom:3px;}
+.yaku-han{font-size:0.68rem;color:var(--gold);margin-bottom:5px;}
+.yaku-desc{font-size:0.7rem;color:rgba(232,224,208,0.6);line-height:1.5;}
+
+/* Result */
+.result-display{text-align:center;padding:16px;}
+.result-type{
+  font-family:'Zen Antique',serif; font-size:2.8rem;
+  color:var(--gold); text-shadow:0 0 30px rgba(200,168,75,0.8);
+  margin-bottom:14px; animation:glow 0.5s ease-out;
+}
+@keyframes glow{from{transform:scale(0.8);opacity:0;}to{transform:scale(1);opacity:1;}}
+.result-hand-display{display:flex;gap:3px;justify-content:center;flex-wrap:wrap;margin-bottom:16px;}
+.result-yaku-list{display:flex;flex-direction:column;gap:5px;margin-bottom:16px;text-align:left;}
+.result-yaku-item{
+  display:flex;justify-content:space-between;
+  padding:5px 9px;background:rgba(255,255,255,0.05);border-radius:4px;
+}
+.result-total{font-size:1.4rem;font-weight:900;color:#2ecc71;margin:8px 0;}
+.result-fu{font-size:0.82rem;color:rgba(232,224,208,0.6);margin-bottom:16px;}
+
+/* Detail */
+.detail-section{margin-bottom:14px;}
+.detail-title{font-size:0.72rem;color:rgba(200,168,75,0.6);letter-spacing:0.1em;margin-bottom:7px;}
+.hand-example{
+  display:flex;gap:3px;flex-wrap:wrap;align-items:center;
+  background:rgba(255,255,255,0.03);padding:9px;border-radius:4px;
+}
+
+/* Notification */
+.notification{
+  position:fixed; top:72px; left:50%; transform:translateX(-50%);
+  background:rgba(10,30,20,0.96);border:1px solid var(--gold);
+  padding:10px 22px; border-radius:6px; font-size:0.87rem;
+  color:var(--ivory); z-index:400; animation:notifSlide 0.3s ease-out;
+  box-shadow:0 4px 20px rgba(0,0,0,0.5); text-align:center; white-space:nowrap;
+}
+@keyframes notifSlide{from{transform:translateX(-50%) translateY(-15px);opacity:0;}to{transform:translateX(-50%) translateY(0);opacity:1;}}
+
+/* Save/restore indicator */
+.save-indicator{
+  position:fixed; bottom:60px; right:14px; z-index:50;
+  font-size:0.68rem; color:rgba(200,168,75,0.4);
+  pointer-events:none; transition:opacity 0.5s;
+}
+
+.hidden{display:none!important;}
+
+/* Selection highlight when in search mode */
+body.search-mode *::selection {
+  background:rgba(200,168,75,0.5);
+  color:var(--green);
+}
+
+/* Snap highlight on search mode click */
+.search-highlight {
+  outline:2px solid var(--gold);
+  outline-offset:2px;
+  border-radius:3px;
+  animation:searchPulse 0.4s ease-out;
+}
+
+@keyframes searchPulse {
+  from{outline-color:rgba(200,168,75,1); transform:scale(1.05);}
+  to{outline-color:rgba(200,168,75,0.6); transform:scale(1);}
+}
+</style>
+</head>
+<body>
+
+<!-- ===== LAYOUT SELECTOR ===== -->
+<div id="layoutSelector">
+  <div class="ls-title">🀄 麻雀アシスタント</div>
+  <div class="ls-subtitle">レイアウトを選択してください</div>
+  <div class="ls-options">
+    <button class="ls-btn" onclick="selectLayout('desktop')">
+      <div class="ls-btn-icon">🖥️</div>
+      <div class="ls-btn-label">デスクトップ</div>
+      <div class="ls-btn-desc">サイドパネルあり<br>広い画面向け</div>
+    </button>
+    <button class="ls-btn" onclick="selectLayout('mobile')">
+      <div class="ls-btn-icon">📱</div>
+      <div class="ls-btn-label">スマートフォン</div>
+      <div class="ls-btn-desc">縦型レイアウト<br>タブで切り替え</div>
+    </button>
+  </div>
+  <div style="font-size:0.7rem;color:rgba(200,168,75,0.4);margin-top:8px;">設定からいつでも変更できます</div>
+</div>
+
+<!-- ===== HEADER ===== -->
+<header id="mainHeader" class="hidden">
+  <div class="header-left">
+    <!-- Search FAB -->
+    <button class="search-fab" id="searchFab" onclick="toggleSearchMode()" title="テキスト検索 (文字をタップ)">🔍</button>
+    <div class="logo">🀄 麻雀</div>
+  </div>
+  <div class="header-right">
+    <button class="btn btn-red" onclick="newGame()" style="font-size:0.75rem;">新規</button>
+    <button class="btn btn-icon" onclick="openYakuList()" title="役一覧">📖</button>
+    <button class="btn btn-icon" id="settingsToggleBtn" onclick="toggleSettings()" title="設定">⚙️</button>
+  </div>
+</header>
+
+<!-- ===== SETTINGS PANEL ===== -->
+<div id="settingsPanel" class="hidden">
+  <div class="settings-header">
+    <span>⚙️ 設定</span>
+    <button class="modal-close" onclick="toggleSettings()">×</button>
+  </div>
+  <div class="settings-body">
+    <div class="settings-group">
+      <div class="settings-label">レイアウト</div>
+      <div class="settings-row">
+        <button class="btn" id="s-desk" onclick="selectLayout('desktop')">🖥️ デスクトップ</button>
+        <button class="btn" id="s-mob" onclick="selectLayout('mobile')">📱 スマホ</button>
+      </div>
+    </div>
+    <div class="settings-divider"></div>
+    <div class="settings-group">
+      <div class="settings-label">プレイ人数</div>
+      <div class="settings-row">
+        <button class="btn" id="s-4ma" onclick="setGameType(4)">四麻</button>
+        <button class="btn" id="s-3ma" onclick="setGameType(3)">三麻</button>
+      </div>
+    </div>
+    <div class="settings-divider"></div>
+    <div class="settings-group">
+      <div class="settings-label">CPUアルゴリズム</div>
+      <select id="cpuAlgo" class="settings-select" onchange="saveSettings()">
+        <option value="random">ツモ切り（完全ランダム）</option>
+        <option value="basic" selected>役狙い（シャンテン最小化）</option>
+        <option value="defense">守備型（安全牌優先）</option>
+        <option value="aggressive">攻撃型（早アガリ重視）</option>
+      </select>
+    </div>
+    <div class="settings-divider"></div>
+    <div class="settings-group">
+      <div class="settings-label">操作</div>
+      <button class="btn btn-red" onclick="newGame(); toggleSettings();" style="width:100%;">🔄 新規ゲーム</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MAIN ===== -->
+<div class="main hidden" id="mainApp">
+  <!-- Game area -->
+  <div class="game-area" id="gameArea">
+    <div class="table">
+      <!-- CPU zone -->
+      <div class="cpu-zone" id="cpuZone">
+        <div class="cpu-player cpu-top" id="cpu1">
+          <div class="cpu-name">対面 <span class="wind-badge" id="wind1">北</span><span id="riichi1"></span></div>
+          <div class="cpu-tiles" id="tiles1"></div>
+          <div class="cpu-score" id="score1">25000</div>
+          <div style="padding:3px;width:100%;">
+            <div class="discard-tiles" id="discard1"></div>
+          </div>
+        </div>
+        <div class="cpu-player cpu-left" id="cpu2">
+          <div class="cpu-name">上家 <span class="wind-badge" id="wind2">西</span><span id="riichi2"></span></div>
+          <div class="cpu-tiles" id="tiles2"></div>
+          <div class="cpu-score" id="score2">25000</div>
+          <div style="padding:3px;width:100%;">
+            <div class="discard-tiles" id="discard2"></div>
+          </div>
+        </div>
+        <div class="cpu-player cpu-right" id="cpu3">
+          <div class="cpu-name">下家 <span class="wind-badge" id="wind3">南</span><span id="riichi3"></span></div>
+          <div class="cpu-tiles" id="tiles3"></div>
+          <div class="cpu-score" id="score3">25000</div>
+          <div style="padding:3px;width:100%;">
+            <div class="discard-tiles" id="discard3"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Center -->
+      <div class="table-center">
+        <div style="text-align:center;">
+          <div class="wind-kanji" id="roundWind">東</div>
+          <div class="wind-label">場風</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
+          <div class="round-display" id="roundDisplay">東1局</div>
+          <div class="honba-display" id="honbaDisplay">本場:0 / R棒:0</div>
+        </div>
+        <div style="text-align:center;">
+          <div class="yama-count" id="yamaCount">70</div>
+          <div class="yama-label">残り牌</div>
+        </div>
+        <div style="text-align:center;">
+          <div class="dora-label">ドラ表示</div>
+          <div id="doraDisplay"></div>
+        </div>
+      </div>
+
+      <!-- Player -->
+      <div class="player-zone">
+        <div class="player-info">
+          <div class="player-name-display">
+            あなた <span class="wind-badge" id="playerWind">東</span>
+            <span id="riichiIndicator" class="hidden"><span class="riichi-indicator">R</span></span>
+            <span id="tenpaiIndicator" class="hidden"><span class="tenpai-badge">テンパイ！</span></span>
+          </div>
+          <div class="player-score-display" id="playerScore">25000点</div>
+        </div>
+        <div class="hand-container" id="playerHand"></div>
+        <div class="discard-zone" style="margin-top:6px;">
+          <div class="discard-label">捨て牌</div>
+          <div class="discard-tiles" id="playerDiscard"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Status -->
+    <div class="status-msg" id="statusMsg">牌を選択して捨ててください</div>
+
+    <!-- Actions -->
+    <div class="action-bar">
+      <button class="action-btn action-tsumo" id="btnTsumo" onclick="declareTsumo()" disabled>ツモ</button>
+      <button class="action-btn action-ron" id="btnRon" onclick="declareRon()" disabled>ロン</button>
+      <button class="action-btn action-riichi" id="btnRiichi" onclick="declareRiichi()" disabled>リーチ</button>
+      <button class="action-btn action-chi" id="btnChi" onclick="declareChi()" disabled>チー</button>
+      <button class="action-btn action-pon" id="btnPon" onclick="declarePon()" disabled>ポン</button>
+      <button class="action-btn action-kan" id="btnKan" onclick="declareKan()" disabled>カン</button>
+      <button class="action-btn action-skip" id="btnSkip" onclick="skipAction()" disabled>スキップ</button>
+    </div>
+  </div>
+
+  <!-- Side panel -->
+  <div class="side-panel" id="sidePanel">
+    <div class="panel" id="panelScore">
+      <div class="panel-header">得点</div>
+      <div class="panel-body">
+        <div id="scorePanel"></div>
+      </div>
+    </div>
+    <div class="panel" id="panelCandidates">
+      <div class="panel-header">
+        <span>捨て牌候補</span>
+        <span style="font-size:0.68rem;color:rgba(200,168,75,0.5);">シャンテン順</span>
+      </div>
+      <div class="panel-body">
+        <div class="candidate-list" id="candidateList"></div>
+      </div>
+    </div>
+    <div class="panel" id="panelLog">
+      <div class="panel-header">ゲームログ</div>
+      <div class="panel-body" style="padding:7px;">
+        <div class="log-list" id="gameLog"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Mobile tab bar -->
+<div class="mobile-tab-bar hidden" id="mobileTabBar">
+  <button class="mob-tab active" id="mtab-game" onclick="switchMobileTab('game')">
+    <div class="mob-tab-icon">🀄</div>
+    <div>ゲーム</div>
+  </button>
+  <button class="mob-tab" id="mtab-score" onclick="switchMobileTab('score')">
+    <div class="mob-tab-icon">📊</div>
+    <div>得点</div>
+  </button>
+  <button class="mob-tab" id="mtab-cand" onclick="switchMobileTab('cand')">
+    <div class="mob-tab-icon">💡</div>
+    <div>候補</div>
+  </button>
+  <button class="mob-tab" id="mtab-log" onclick="switchMobileTab('log')">
+    <div class="mob-tab-icon">📋</div>
+    <div>ログ</div>
+  </button>
+</div>
+
+<!-- Save indicator -->
+<div class="save-indicator" id="saveIndicator">💾 保存済み</div>
+
+<!-- Modal -->
+<div class="modal-overlay hidden" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal" id="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle"></div>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<!-- Search overlay (capture clicks in search mode) -->
+<div id="searchModeOverlay" onclick="handleSearchClick(event)"></div>
+
+<!-- Search result panel -->
+<div id="searchPanel" class="hidden">
+  <div class="sp-handle"></div>
+  <div class="sp-header">
+    <div class="sp-query" id="spQuery"></div>
+    <button class="sp-close" onclick="closeSearchPanel()">×</button>
+  </div>
+  <div class="sp-body" id="spBody"></div>
+</div>
+
+<script>
+// ============================================================
+// MAHJONG GLOSSARY
+// ============================================================
+const GLOSSARY = {
+  // 基本用語
+  '東家': { read:'とんちゃ / とんや', def:'場の中で最初の親（親番）。東の風牌が自風になる。東1局の最初のプレイヤーが東家となる。' },
+  '南家': { read:'なんちゃ', def:'東家の下家（次の人）。南の風牌が自風になる。' },
+  '西家': { read:'しゃーちゃ', def:'東家の対面（向かいの人）から見て右隣。西の風牌が自風。' },
+  '北家': { read:'ぺーちゃ', def:'東家の上家（左隣）。北の風牌が自風。' },
+  '親': { read:'おや', def:'その局で最初にツモる特権プレイヤー。アガリで連荘（同じ局を続けられる）。ツモアガリ・放銃時の点数が多くなる。' },
+  '子': { read:'こ', def:'親以外の3人。点数の支払いは親の半額。' },
+  '場': { read:'ば', def:'現在の局がどの風かを示す。東場は東1〜4局、南場は南1〜4局。' },
+  'ツモ': { read:'つも', def:'山牌から1枚牌を引くこと。またはツモアガリ（自分で引いた牌でアガること）。' },
+  'ロン': { read:'ろん', def:'他プレイヤーが捨てた牌でアガること。放銃した人が全額払う。' },
+  '捨て牌': { read:'すてはい', def:'不要な牌を自分の捨て場に出すこと。捨てた牌の順番が記録され、他プレイヤーの待ちを推測する情報になる。' },
+  '山牌': { read:'やまはい', def:'まだ誰にも配られていない残り牌の山。ここからツモる。' },
+  '手牌': { read:'てはい', def:'自分が持っている13枚（ツモ後は14枚）の牌。' },
+  '配牌': { read:'はいはい', def:'ゲーム開始時に配られる13枚の牌。' },
+  'アガリ': { read:'あがり', def:'14枚の手牌を特定の形（面子4つ＋雀頭1つ等）に完成させること。役が必要。' },
+  '役': { read:'やく', def:'アガリに必要な手の形のルール。役がないとアガれない。各役には翻数があり、得点に直結する。' },
+  '翻': { read:'はん', def:'役の強さを示す単位。翻数が多いほど得点が高い。符と組み合わせて得点計算する。' },
+  '符': { read:'ふ', def:'得点計算の基礎単位。30符や40符など。翻数とセットで基本点を計算する。' },
+  'シャンテン': { read:'しゃんてん', def:'あと何枚でテンパイになるかを示す数。0シャンテン=テンパイ。-1=アガリ形。数値が小さいほどアガリに近い。' },
+  'テンパイ': { read:'てんぱい', def:'あと1枚でアガれる状態（0シャンテン）。この状態でリーチ宣言が可能。' },
+  'リーチ': { read:'りーち', def:'テンパイ時に1000点を供託して宣言する役。宣言後は手牌を変えられない（ツモ切り強制）。裏ドラが乗る可能性あり。' },
+  '面子': { read:'めんつ', def:'3枚で1組を作る基本単位。刻子（同じ牌3枚）か順子（連続する3枚）。アガリには面子4つ＋雀頭1つが必要（通常形）。' },
+  '刻子': { read:'こーつ', def:'同じ牌を3枚揃えた面子。例：東東東、白白白。' },
+  '順子': { read:'しゅんつ', def:'同じ種類で連続する数牌3枚の面子。例：１２３m、⑤⑥⑦。' },
+  '雀頭': { read:'じゃんとう', def:'アガリに必要な2枚一組の対子（おとも牌とも呼ぶ）。役の制約になる場合がある（平和の雀頭は役牌不可など）。' },
+  '対子': { read:'とーつ', def:'同じ牌2枚の組み合わせ。雀頭またはチートイツの素材。' },
+  '塔子': { read:'たーつ', def:'面子になりそうな2枚の組み合わせ。両面（リャンメン）・嵌張（カンチャン）・辺張（ペンチャン）の3種。' },
+  '両面': { read:'りゃんめん', def:'23のような連続2枚の塔子。1・4または両端の2種類の牌でアガれる。最も有利な待ち。' },
+  '嵌張': { read:'かんちゃん', def:'13のような2枚の塔子。2のみでアガれる1種待ち。' },
+  '辺張': { read:'ぺんちゃん', def:'12または89のような端の塔子。3か7のみでアガれる1種待ち。' },
+  'ドラ': { read:'どら', def:'アガリ時に翻が1翻加算されるボーナス牌。表示牌の次の牌がドラ。役はないので単独ではアガれない。' },
+  '裏ドラ': { read:'うらどら', def:'リーチ成功時のみ開く追加ドラ。アガリ時に1枚につき1翻加算。' },
+  'カンドラ': { read:'かんどら', def:'カン（4枚使い）した後に追加されるドラ表示牌。' },
+  'カン': { read:'かん', def:'同じ牌4枚を使って特殊な面子（槓子）を作る宣言。追加ツモができ、カンドラが増える。' },
+  'ポン': { read:'ぽん', def:'他プレイヤーの捨て牌を使って刻子を作る宣言。鳴き（副露）の一種。門前でなくなる。' },
+  'チー': { read:'ちー', def:'上家（左隣）の捨て牌を使って順子を作る宣言。鳴きの一種。上家からのみ可能。' },
+  '鳴き': { read:'なき', def:'ポン・チー・カンで他プレイヤーの捨て牌を使うこと。副露とも言う。鳴くと門前でなくなり使える役が減る。' },
+  '副露': { read:'ふーろ', def:'鳴きの正式名称。ポン・チー・カンで牌を取ること。' },
+  '門前': { read:'もんぜん', def:'一度も鳴いていない状態。門前でないと使えない役がある（リーチ、門前清自摸和など）。' },
+  '本場': { read:'ほんば', def:'連荘（親が続くこと）や流局が続くと増えるカウンター。本場数×300点がアガリ点に加算される。' },
+  'リーチ棒': { read:'りーちぼう', def:'リーチ宣言時に場に供託される1000点棒。次にアガった人がすべて受け取る。' },
+  '供託': { read:'きょうたく', def:'リーチ棒など場に置かれた点棒。次のアガリ者が受け取る。' },
+  '放銃': { read:'ほうじゅう', def:'他プレイヤーにロンされること（振り込み）。放銃した人が全額支払う。' },
+  '振り込み': { read:'ふりこみ', def:'放銃の別名。他プレイヤーの待ち牌を捨ててしまいロンされること。' },
+  '流局': { read:'りゅうきょく', def:'山牌がなくなってアガリ者がいなかった場合に局が終わる。テンパイ者には点数移動がある（ノーテン罰符）。' },
+  '連荘': { read:'れんちゃん', def:'親がアガるか流局テンパイすると同じ親番が続くこと。' },
+  'ノーテン': { read:'のーてん', def:'流局時にテンパイしていない状態。罰符としてテンパイ者に点数を払う。' },
+  '東風戦': { read:'とんぷうせん', def:'東場のみ（東1〜4局）で終わる短いゲーム形式。' },
+  '半荘': { read:'はんちゃん', def:'東場＋南場（合計8局）で行うゲーム形式。標準的な形式。' },
+  '一発': { read:'いっぱつ', def:'リーチ後、最初のツモまたは他プレイヤーの最初の捨て牌でアガると付く1翻の役。' },
+  '海底': { read:'はいてい', def:'山牌の最後の1枚をツモったとき。海底撈月という役が付く（1翻）。' },
+  '河底': { read:'ほーてい', def:'海底牌をツモった後に捨てた牌でロンされること。河底撈魚という役が付く（1翻）。' },
+  '嶺上': { read:'りんしゃん', def:'カン後に引く補充牌。嶺上牌でアガると嶺上開花（1翻）という役が付く。' },
+  '槍槓': { read:'ちゃんかん', def:'他プレイヤーの加槓した牌でロンすること。加槓とは暗刻にポンした刻子に追加する場面。槍槓という役（1翻）が付く。' },
+  '断幺九': { read:'たんやおちゅう（タンヤオ）', def:'1・9・字牌を一切含まない手。鳴いても成立する使いやすい1翻役。' },
+  '平和': { read:'ぴんふ', def:'4面子すべて順子、雀頭が役牌以外、両面待ちの門前限定1翻役。符が20符固定になる。' },
+  '役牌': { read:'やくはい', def:'白・発・中・場風・自風の字牌を3枚揃えた刻子で成立する役（各1翻）。' },
+  '七対子': { read:'ちーとーつ', def:'7種類異なる対子（2枚ずつ）で構成する2翻役。25符固定。鳴き不可。' },
+  '対々和': { read:'といといわ（トイトイ）', def:'4面子すべて刻子（3枚組）で構成する2翻役。' },
+  '一気通貫': { read:'いっきつうかん（イッツー）', def:'同じ種類の数牌で1-2-3、4-5-6、7-8-9の3組の順子を揃える役。' },
+  '三色同順': { read:'さんしょくどうじゅん（サンショク）', def:'マン・ピン・ソーで同じ数字の順子3組を揃える役。' },
+  '混一色': { read:'ほんいつ', def:'1種類の数牌と字牌のみで構成する役。門前3翻、鳴き2翻。' },
+  '清一色': { read:'ちんいつ', def:'1種類の数牌のみで構成する役。門前6翻、鳴き5翻。最高の染め手。' },
+  '国士無双': { read:'こくしむそう', def:'1・9・東・南・西・北・白・発・中の各1枚と、そのうち1種の対子を作る役満。' },
+  '四暗刻': { read:'すーあんこう', def:'4組すべて暗刻（自分でツモった刻子）で構成する役満。' },
+  '大三元': { read:'だいさんげん', def:'白・発・中の三元牌すべてを刻子にする役満。' },
+  '役満': { read:'やくまん', def:'最高位の役。通常の得点計算ではなく一定の高い点数（32000点等）が保証される。' },
+  '満貫': { read:'まんがん', def:'5翻以上または翻符計算で8000点を超えると適用される得点上限。基本点2000点×4倍=8000点。' },
+  '跳満': { read:'はねまん', def:'6〜7翻のアガリに適用。基本点3000点。' },
+  '倍満': { read:'ばいまん', def:'8〜10翻に適用。基本点4000点。' },
+  '三倍満': { read:'さんばいまん', def:'11〜12翻に適用。基本点6000点。' },
+  '点棒': { read:'てんぼう', def:'点数を表す棒。100点棒・1000点棒・5000点棒・10000点棒がある。' },
+  '東場': { read:'とんば', def:'ゲーム序盤の場。東1〜4局で構成。' },
+  '南場': { read:'なんば', def:'ゲーム中盤の場。南1〜4局で構成（半荘の場合）。' },
+  // 牌の種類
+  '萬子': { read:'まんず', def:'1〜9の漢数字が書かれた牌（数牌）。一万〜九万。赤い文字。' },
+  '筒子': { read:'ぴんず', def:'1〜9個の円が描かれた牌（数牌）。一筒〜九筒。' },
+  '索子': { read:'そーず', def:'1〜9本の竹が描かれた牌（数牌）。一索〜九索。' },
+  '字牌': { read:'じはい', def:'数字のない牌。風牌（東南西北）と三元牌（白発中）の7種類。順子を作れない。' },
+  '風牌': { read:'かぜはい', def:'東・南・西・北の4種類の字牌。場風・自風（門風）が役牌になる。' },
+  '三元牌': { read:'さんげんはい', def:'白・発・中の3種類の字牌。3枚揃えると常に役牌（1翻）になる。' },
+  '数牌': { read:'すうはい', def:'萬子・筒子・索子の総称。1〜9の数字があり順子を作れる。' },
+  '端牌': { read:'はんぱい', def:'1・9の数牌。端（老頭牌）と言う。一部の役の条件になる。' },
+  '老頭牌': { read:'ろうとうはい', def:'1・9の数牌（端牌）の正式名称。' },
+  '暗刻': { read:'あんこー', def:'自分のツモのみで完成させた刻子。ロンでの最後の1枚は明刻扱い。' },
+  '明刻': { read:'みんこー', def:'ポンや他の牌を使って作った刻子。' },
+  '暗槓': { read:'あんかん', def:'自分の手牌内の4枚同じ牌でカンすること。手牌を見せない秘密のカン。' },
+  '明槓': { read:'みんかん', def:'ポンした刻子に4枚目を加えてカンすること（加槓）、または他プレイヤーの捨て牌で4枚にするカン（大明槓）。' },
+};
+
+// ============================================================
+// SEARCH MODE
+// ============================================================
+let searchModeActive = false;
+let searchPanelOpen = false;
+
+function toggleSearchMode() {
+  searchModeActive = !searchModeActive;
+  const fab = document.getElementById('searchFab');
+  const overlay = document.getElementById('searchModeOverlay');
+  const banner = document.getElementById('searchBanner');
+
+  if (searchModeActive) {
+    fab.classList.add('active');
+    overlay.classList.add('active');
+    document.body.classList.add('search-mode');
+    // Show banner
+    if (!document.getElementById('searchBanner')) {
+      const b = document.createElement('div');
+      b.id = 'searchBanner';
+      b.className = 'search-mode-banner';
+      b.textContent = '🔍 検索モード：調べたい文字をタップ／クリック';
+      document.body.appendChild(b);
+    }
+  } else {
+    fab.classList.remove('active');
+    overlay.classList.remove('active');
+    document.body.classList.remove('search-mode');
+    const b = document.getElementById('searchBanner');
+    if (b) b.remove();
+  }
+}
+
+function handleSearchClick(e) {
+  if (!searchModeActive) return;
+  e.preventDefault(); e.stopPropagation();
+
+  // Get the element under pointer (behind overlay)
+  overlay.style.pointerEvents = 'none';
+  const el = document.elementFromPoint(e.clientX, e.clientY);
+  overlay.style.pointerEvents = '';
+
+  if (!el) return;
+
+  // Flash highlight
+  el.classList.add('search-highlight');
+  setTimeout(() => el.classList.remove('search-highlight'), 600);
+
+  // Get text to search
+  let text = '';
+
+  // Check if there's a window selection first
+  const sel = window.getSelection();
+  if (sel && sel.toString().trim().length > 0) {
+    text = sel.toString().trim();
+    sel.removeAllRanges();
+  } else {
+    // Use element's text content
+    text = (el.textContent || el.innerText || '').trim();
+    // Limit to meaningful length
+    if (text.length > 20) text = text.slice(0, 10);
+  }
+
+  if (text) {
+    searchTerm(text);
+    // Disable search mode after finding
+    toggleSearchMode();
+  }
+}
+
+function searchTerm(query) {
+  if (!query) return;
+  query = query.trim();
+
+  document.getElementById('spQuery').textContent = '「' + query + '」';
+  document.getElementById('searchPanel').classList.remove('hidden');
+  searchPanelOpen = true;
+
+  const body = document.getElementById('spBody');
+
+  // Look up in glossary
+  let found = null;
+  // Exact match first
+  if (GLOSSARY[query]) {
+    found = { term: query, ...GLOSSARY[query] };
+  } else {
+    // Partial match
+    for (const [k, v] of Object.entries(GLOSSARY)) {
+      if (k.includes(query) || query.includes(k) || (v.read && v.read.includes(query))) {
+        found = { term: k, ...v };
+        break;
+      }
+    }
+  }
+
+  const encodedGoogle = encodeURIComponent('麻雀 ' + query);
+  const encodedWiki = encodeURIComponent('麻雀 ' + query);
+
+  const webSection = `
+    <div class="sp-web-section">
+      <div class="sp-web-label">外部サイトで詳しく調べる</div>
+      <div class="sp-web-btns">
+        <a class="sp-web-btn" href="https://www.google.com/search?q=${encodedGoogle}" target="_blank" onclick="saveGameState()">🔎 Google検索</a>
+        <a class="sp-web-btn" href="https://ja.wikipedia.org/wiki/Special:Search?search=${encodedWiki}" target="_blank" onclick="saveGameState()">📚 Wikipedia</a>
+        <a class="sp-web-btn" href="https://mahjong.guide/a-quick-guide-to-mahjong/" target="_blank" onclick="saveGameState()">🃏 麻雀ガイド</a>
+      </div>
+      <div style="font-size:0.68rem;color:rgba(232,224,208,0.4);margin-top:8px;">※ 外部ページに移動してもゲームの進行は自動保存されます</div>
+    </div>
+  `;
+
+  if (found) {
+    body.innerHTML = `
+      <div class="sp-reading">${found.read ? '読み方：' + found.read : ''}</div>
+      <div class="sp-definition">${found.def}</div>
+      ${webSection}
+    `;
+  } else {
+    body.innerHTML = `
+      <div class="sp-notfound">「${query}」の用語説明が見つかりませんでした。</div>
+      <div style="font-size:0.8rem;color:rgba(232,224,208,0.5);margin-bottom:16px;">以下のサイトで検索することができます：</div>
+      ${webSection}
+    `;
+  }
+}
+
+function closeSearchPanel() {
+  document.getElementById('searchPanel').classList.add('hidden');
+  searchPanelOpen = false;
+}
+
+// Expose for use in anchor onclick
+const overlay = document.getElementById('searchModeOverlay');
+
+// ============================================================
+// LAYOUT SYSTEM
+// ============================================================
+let currentLayout = 'desktop';
+
+function selectLayout(type) {
+  currentLayout = type;
+  document.body.classList.remove('layout-desktop', 'layout-mobile');
+  document.body.classList.add('layout-' + type);
+
+  // Show main UI
+  document.getElementById('layoutSelector').classList.add('hidden');
+  document.getElementById('mainHeader').classList.remove('hidden');
+  document.getElementById('mainApp').classList.remove('hidden');
+
+  // Mobile tab bar
+  const tabBar = document.getElementById('mobileTabBar');
+  if (type === 'mobile') {
+    tabBar.classList.remove('hidden');
+    // Hide side panel by default in mobile
+    document.getElementById('sidePanel').classList.remove('mobile-visible');
+    // Main layout becomes 1 column
+  } else {
+    tabBar.classList.add('hidden');
+    document.getElementById('sidePanel').style.display = '';
+  }
+
+  // Update settings buttons
+  document.getElementById('s-desk').classList.toggle('active', type === 'desktop');
+  document.getElementById('s-mob').classList.toggle('active', type === 'mobile');
+
+  // Save preference
+  try { localStorage.setItem('mahjong_layout', type); } catch(e) {}
+
+  // Start game if not started
+  if (!G) {
+    newGame();
+  } else {
+    updateUI();
+  }
+}
+
+function switchMobileTab(tab) {
+  document.querySelectorAll('.mob-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('mtab-' + (tab === 'game' ? 'game' : tab === 'score' ? 'score' : tab === 'cand' ? 'cand' : 'log')).classList.add('active');
+
+  const gameArea = document.getElementById('gameArea');
+  const sidePanel = document.getElementById('sidePanel');
+  const panels = { score: 'panelScore', cand: 'panelCandidates', log: 'panelLog' };
+
+  if (tab === 'game') {
+    gameArea.style.display = '';
+    sidePanel.classList.remove('mobile-visible');
+  } else {
+    gameArea.style.display = 'none';
+    sidePanel.classList.add('mobile-visible');
+    // Show only relevant panel
+    ['panelScore','panelCandidates','panelLog'].forEach(p => {
+      document.getElementById(p).style.display = p === panels[tab] ? '' : 'none';
+    });
+  }
+}
+
+// ============================================================
+// SETTINGS
+// ============================================================
+let settingsOpen = false;
+
+function toggleSettings() {
+  settingsOpen = !settingsOpen;
+  const panel = document.getElementById('settingsPanel');
+  panel.classList.toggle('hidden', !settingsOpen);
+  document.getElementById('settingsToggleBtn').classList.toggle('active', settingsOpen);
+}
+
+function saveSettings() {
+  const algo = document.getElementById('cpuAlgo').value;
+  try { localStorage.setItem('mahjong_cpu', algo); } catch(e) {}
+}
+
+// Close settings when clicking outside
+document.addEventListener('click', (e) => {
+  if (settingsOpen &&
+      !document.getElementById('settingsPanel').contains(e.target) &&
+      !document.getElementById('settingsToggleBtn').contains(e.target)) {
+    settingsOpen = false;
+    document.getElementById('settingsPanel').classList.add('hidden');
+    document.getElementById('settingsToggleBtn').classList.remove('active');
+  }
+});
+
+// ============================================================
+// GAME STATE SAVE / RESTORE
+// ============================================================
+function saveGameState() {
+  if (!G) return;
+  try {
+    const state = {
+      G: JSON.stringify(G),
+      gameType,
+      layout: currentLayout,
+      ts: Date.now()
+    };
+    localStorage.setItem('mahjong_save', JSON.stringify(state));
+    const ind = document.getElementById('saveIndicator');
+    ind.style.opacity = '1';
+    setTimeout(() => { ind.style.opacity = '0'; }, 2000);
+  } catch(e) {}
+}
+
+function loadGameState() {
+  try {
+    const raw = localStorage.getItem('mahjong_save');
+    if (!raw) return false;
+    const state = JSON.parse(raw);
+    // Only restore if saved within 24h
+    if (Date.now() - state.ts > 86400000) return false;
+    G = JSON.parse(state.G);
+    gameType = state.layout ? (state.gameType || 4) : 4;
+    return state.layout || 'desktop';
+  } catch(e) {
+    return false;
+  }
+}
+
+// Auto-save every 5 seconds during game
+setInterval(() => { if (G && !G.gameOver) saveGameState(); }, 5000);
+
+// ============================================================
+// TILE DEFINITIONS
+// ============================================================
+const TILE_DISPLAY = {
+  man: (n) => ({ text: n + 'm', color: 'man' }),
+  pin: (n) => ({ text: n + 'p', color: 'pin' }),
+  sou: (n) => ({ text: n + 's', color: 'sou' }),
+  jihai: (n) => {
+    const chars = ['東','南','西','北','白','発','中'];
+    const colors = ['jihai','jihai','jihai','jihai','haku','hatsu','chun'];
+    return { text: chars[n-1], color: colors[n-1] };
+  }
+};
+
+let gameType = 4;
+
+function createTile(suit, num, id) { return { suit, num, id }; }
+
+function tileDisplay(tile) {
+  if (tile.suit === 'jihai') return TILE_DISPLAY.jihai(tile.num);
+  return TILE_DISPLAY[tile.suit](tile.num);
+}
+
+function tileKey(t) { return t.suit + t.num; }
+
+function createTileset() {
+  const tiles = []; let id = 0;
+  const suits = gameType === 4 ? ['man','pin','sou'] : ['pin','sou'];
+  for (const suit of suits) {
+    for (let num = 1; num <= 9; num++)
+      for (let k = 0; k < 4; k++) tiles.push(createTile(suit, num, id++));
+  }
+  if (gameType === 3) {
+    for (const num of [1,9])
+      for (let k = 0; k < 4; k++) tiles.push(createTile('man', num, id++));
+  }
+  for (let num = 1; num <= 7; num++)
+    for (let k = 0; k < 4; k++) tiles.push(createTile('jihai', num, id++));
+  return tiles;
+}
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+// ============================================================
+// GAME STATE
+// ============================================================
+let G = null;
+
+function initGame() {
+  const playerCount = gameType === 4 ? 4 : 3;
+  const tileset = shuffle(createTileset());
+  const players = [];
+  for (let i = 0; i < playerCount; i++) {
+    players.push({
+      hand: [], discards: [], melds: [],
+      score: 25000, riichi: false, riichiTurn: -1,
+      isPlayer: i === 0,
+      name: i === 0 ? 'あなた' : ['対面','上家','下家'][i-1],
+      wind: null
+    });
+  }
+  const dora = tileset.splice(0, 1)[0];
+  const yama = tileset.splice(0, tileset.length);
+  for (let i = 0; i < playerCount; i++) players[i].hand = yama.splice(0, 13);
+
+  G = {
+    players, yama, dora: [dora], kanDora: [],
+    round: 1, honba: 0, riichiPot: 0,
+    currentTurn: 0, phase: 'draw',
+    tsumoTile: null, pendingAction: null,
+    gameOver: false, turnCount: 0, playerCount
+  };
+
+  assignWinds();
+  drawTile(0);
+}
+
+function assignWinds() {
+  const roundWinds = ['東','南','西','北'];
+  const winds = ['東','南','西','北'];
+  G.players.forEach((p, i) => { p.wind = winds[i % G.playerCount]; });
+  const ri = Math.floor((G.round - 1) / G.playerCount);
+  G.roundWindName = roundWinds[ri] || '東';
+}
+
+function drawTile(playerIdx) {
+  if (G.yama.length === 0) { handleRyuukyoku(); return; }
+  const tile = G.yama.shift();
+  if (playerIdx === 0) { G.tsumoTile = tile; }
+  else { G.players[playerIdx].hand.push(tile); }
+  G.turnCount++;
+}
+
+function getPlayerHand(playerIdx) {
+  const p = G.players[playerIdx];
+  if (playerIdx === 0 && G.tsumoTile) return [...p.hand, G.tsumoTile];
+  return [...p.hand];
+}
+
+// ============================================================
+// SHANTEN
+// ============================================================
+function sortTiles(tiles) {
+  return [...tiles].sort((a, b) => {
+    const s = { man:0, pin:1, sou:2, jihai:3 };
+    if (a.suit !== b.suit) return s[a.suit] - s[b.suit];
+    return a.num - b.num;
+  });
+}
+
+function countTiles(tiles) {
+  const c = {};
+  for (const t of tiles) { const k = tileKey(t); c[k] = (c[k]||0)+1; }
+  return c;
+}
+
+function calcShanten(tiles) {
+  if (tiles.length === 0) return 8;
+  const sorted = sortTiles(tiles);
+  return Math.min(calcNormalShanten(sorted), calcChiitoiShanten(sorted), calcKokushiShanten(sorted));
+}
+
+function calcNormalShanten(tiles) {
+  let minShanten = 8;
+  const tryPair = (pairSuit, pairNum) => {
+    let remaining = [...tiles];
+    if (pairSuit !== null) {
+      let removed = 0;
+      remaining = remaining.filter(t => {
+        if (removed < 2 && t.suit === pairSuit && t.num === pairNum) { removed++; return false; }
+        return true;
+      });
+      if (removed < 2) return;
+    }
+    const { mentsu, taatsu } = greedyExtract(remaining);
+    const pairs = pairSuit !== null ? 1 : 0;
+    const needed = 4;
+    const have_taatsu = Math.min(taatsu, needed - mentsu);
+    const shanten = (needed - mentsu) * 2 - have_taatsu - pairs - 1;
+    minShanten = Math.min(minShanten, Math.max(-1, shanten));
+  };
+  tryPair(null, null);
+  for (const t of tiles) tryPair(t.suit, t.num);
+  return minShanten;
+}
+
+function greedyExtract(tiles) {
+  const byGroup = { man:[], pin:[], sou:[], jihai:[] };
+  for (const t of tiles) byGroup[t.suit].push(t.num);
+  Object.keys(byGroup).forEach(k => byGroup[k].sort((a,b)=>a-b));
+  let mentsu = 0, taatsu = 0;
+  for (const suit of ['man','pin','sou','jihai']) {
+    const nums = [...byGroup[suit]];
+    for (let i = nums.length - 1; i >= 2; i--) {
+      if (nums[i] === nums[i-1] && nums[i] === nums[i-2]) { mentsu++; nums.splice(i-2,3); i -= 2; }
+    }
+    if (suit !== 'jihai') {
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (let n = 1; n <= 7; n++) {
+          const i1 = nums.indexOf(n), i2 = nums.indexOf(n+1), i3 = nums.indexOf(n+2);
+          if (i1 >= 0 && i2 >= 0 && i3 >= 0) {
+            mentsu++;
+            [i1,i2,i3].sort((a,b)=>b-a).forEach(i=>nums.splice(i,1));
+            changed = true; break;
+          }
+        }
+      }
+      for (let i = 0; i < nums.length - 1; i++) {
+        if (nums[i+1] - nums[i] <= 2) { taatsu++; nums.splice(i,2); i--; }
+        else if (nums[i+1] === nums[i]) { taatsu++; nums.splice(i,2); i--; }
+      }
+    } else {
+      for (let i = 0; i < nums.length - 1; i++) {
+        if (nums[i+1] === nums[i]) { taatsu++; nums.splice(i,2); i--; }
+      }
+    }
+  }
+  return { mentsu, taatsu };
+}
+
+function calcChiitoiShanten(tiles) {
+  const counts = countTiles(tiles);
+  const pairs = Object.values(counts).filter(c => c >= 2).length;
+  return 6 - pairs;
+}
+
+function calcKokushiShanten(tiles) {
+  const terminals = ['man1','man9','pin1','pin9','sou1','sou9','jihai1','jihai2','jihai3','jihai4','jihai5','jihai6','jihai7'];
+  const tileKeys = new Set(tiles.map(tileKey));
+  let unique = 0, pair = false;
+  for (const t of terminals) {
+    if (tileKeys.has(t)) { unique++; if ((countTiles(tiles)[t]||0) >= 2) pair = true; }
+  }
+  return 13 - unique - (pair ? 1 : 0);
+}
+
+// ============================================================
+// AGARI CHECK
+// ============================================================
+function checkAgari(tiles) {
+  const sorted = sortTiles(tiles);
+  if (sorted.length !== 14) return null;
+  if (isChiitoitsu(sorted)) return { valid:true, type:'chiitoitsu' };
+  if (isKokushi(sorted)) return { valid:true, type:'kokushi' };
+  if (isNormalAgari(sorted)) return { valid:true, type:'normal' };
+  return null;
+}
+
+function isChiitoitsu(tiles) {
+  const counts = countTiles(tiles);
+  const vals = Object.values(counts);
+  return vals.length === 7 && vals.every(c => c === 2);
+}
+
+function isKokushi(tiles) {
+  const terminals = ['man1','man9','pin1','pin9','sou1','sou9','jihai1','jihai2','jihai3','jihai4','jihai5','jihai6','jihai7'];
+  const counts = countTiles(tiles);
+  const hasPair = terminals.some(t => (counts[t]||0) >= 2);
+  const hasAll = terminals.every(t => (counts[t]||0) >= 1);
+  return hasAll && hasPair;
+}
+
+function isNormalAgari(tiles) {
+  for (const t of tiles) {
+    const remaining = [...tiles];
+    let removed = 0;
+    const withoutPair = remaining.filter(x => {
+      if (removed < 2 && tileKey(x) === tileKey(t)) { removed++; return false; }
+      return true;
+    });
+    if (removed === 2 && canFormMentsu(withoutPair)) return true;
+  }
+  return false;
+}
+
+function canFormMentsu(tiles) {
+  if (tiles.length === 0) return true;
+  const sorted = sortTiles(tiles);
+  const t = sorted[0];
+  if (sorted.filter(x => tileKey(x) === tileKey(t)).length >= 3) {
+    let count = 0;
+    const rest = sorted.filter(x => { if (count < 3 && tileKey(x) === tileKey(t)) { count++; return false; } return true; });
+    if (canFormMentsu(rest)) return true;
+  }
+  if (t.suit !== 'jihai' && t.num <= 7) {
+    const n1 = sorted.findIndex(x => tileKey(x) === tileKey(t));
+    const n2 = sorted.findIndex(x => x.suit === t.suit && x.num === t.num + 1);
+    const n3 = sorted.findIndex(x => x.suit === t.suit && x.num === t.num + 2);
+    if (n1 >= 0 && n2 >= 0 && n3 >= 0) {
+      const rest = sorted.filter((_, i) => i !== n1 && i !== n2 && i !== n3);
+      if (canFormMentsu(rest)) return true;
+    }
+  }
+  return false;
+}
+
+// ============================================================
+// YAKU DETECTION
+// ============================================================
+function detectYaku(tiles, playerState, context) {
+  const yaku = [];
+  const { riichi, tsumo, seat_wind, round_wind, melds } = context;
+  const isClosed = (melds || []).length === 0;
+
+  if (riichi) yaku.push({ name:'リーチ', han:1 });
+  if (tsumo && isClosed) yaku.push({ name:'門前清自摸和', han:1 });
+
+  const hasTerminal = tiles.some(t => t.suit === 'jihai' || t.num === 1 || t.num === 9);
+  if (!hasTerminal) yaku.push({ name:'断幺九', han:1 });
+
+  if (isClosed && isPinfuCheck(tiles, round_wind, seat_wind)) yaku.push({ name:'平和', han:1 });
+
+  yaku.push(...checkYakuhai(tiles, seat_wind, round_wind));
+
+  if (isChiitoitsu(sortTiles(tiles))) yaku.push({ name:'七対子', han:2 });
+
+  const suits = new Set(tiles.filter(t => t.suit !== 'jihai').map(t => t.suit));
+  const hasJihai = tiles.some(t => t.suit === 'jihai');
+  if (suits.size === 1) {
+    if (!hasJihai) yaku.push({ name:'清一色', han: isClosed ? 6 : 5 });
+    else yaku.push({ name:'混一色', han: isClosed ? 3 : 2 });
+  }
+
+  if (isSanshokuDoujun(tiles)) yaku.push({ name:'三色同順', han: isClosed ? 2 : 1 });
+  if (isSanshokuDoukou(tiles)) yaku.push({ name:'三色同刻', han:2 });
+  if (isIttsu(tiles)) yaku.push({ name:'一気通貫', han: isClosed ? 2 : 1 });
+  if (isKokushi(sortTiles(tiles))) yaku.push({ name:'国士無双', han:13 });
+  if (tiles.every(t => t.suit === 'jihai')) yaku.push({ name:'字一色', han:13 });
+  if (isRyuuiisou(tiles)) yaku.push({ name:'緑一色', han:13 });
+  if (tiles.every(t => t.suit !== 'jihai' && (t.num === 1 || t.num === 9))) yaku.push({ name:'清老頭', han:13 });
+
+  return yaku;
+}
+
+function isPinfuCheck(tiles, round_wind, seat_wind) {
+  const counts = countTiles(tiles);
+  const pair_key = Object.keys(counts).find(k => counts[k] === 2);
+  if (!pair_key) return false;
+  if (pair_key.startsWith('jihai')) {
+    const num = parseInt(pair_key.replace('jihai',''));
+    if (num >= 5) return false;
+    const windNums = {'東':1,'南':2,'西':3,'北':4};
+    if (num === windNums[round_wind] || num === windNums[seat_wind]) return false;
+  }
+  return true;
+}
+
+function checkYakuhai(tiles, seat_wind, round_wind) {
+  const yaku = []; const counts = countTiles(tiles);
+  const windMap = {'東':1,'南':2,'西':3,'北':4};
+  if ((counts['jihai5']||0) >= 3) yaku.push({ name:'白', han:1 });
+  if ((counts['jihai6']||0) >= 3) yaku.push({ name:'発', han:1 });
+  if ((counts['jihai7']||0) >= 3) yaku.push({ name:'中', han:1 });
+  const sw = windMap[seat_wind];
+  if (sw && (counts[`jihai${sw}`]||0) >= 3) yaku.push({ name:`${seat_wind}(門風)`, han:1 });
+  const rw = windMap[round_wind];
+  if (rw && rw !== sw && (counts[`jihai${rw}`]||0) >= 3) yaku.push({ name:`${round_wind}(場風)`, han:1 });
+  return yaku;
+}
+
+function isSanshokuDoujun(tiles) {
+  const seqs = { man:new Set(), pin:new Set(), sou:new Set() };
+  const sorted = sortTiles(tiles);
+  for (const suit of ['man','pin','sou']) {
+    const nums = sorted.filter(t=>t.suit===suit).map(t=>t.num).sort((a,b)=>a-b);
+    for (let i = 0; i <= nums.length-3; i++) {
+      if (nums[i+1]===nums[i]+1 && nums[i+2]===nums[i]+2) seqs[suit].add(nums[i]);
+    }
+  }
+  for (const n of seqs.man) { if (seqs.pin.has(n) && seqs.sou.has(n)) return true; }
+  return false;
+}
+
+function isSanshokuDoukou(tiles) {
+  const counts = {};
+  for (const t of tiles) {
+    if (t.suit==='jihai') continue;
+    if (!counts[t.num]) counts[t.num]={man:0,pin:0,sou:0};
+    counts[t.num][t.suit]=(counts[t.num][t.suit]||0)+1;
+  }
+  return Object.values(counts).some(c=>c.man>=3&&c.pin>=3&&c.sou>=3);
+}
+
+function isIttsu(tiles) {
+  for (const suit of ['man','pin','sou']) {
+    const nums = new Set(tiles.filter(t=>t.suit===suit).map(t=>t.num));
+    if ([1,2,3,4,5,6,7,8,9].every(n=>nums.has(n))) return true;
+  }
+  return false;
+}
+
+function isRyuuiisou(tiles) {
+  const green = new Set(['sou2','sou3','sou4','sou6','sou8','jihai6']);
+  return tiles.every(t=>green.has(tileKey(t)));
+}
+
+// ============================================================
+// SCORE CALCULATION
+// ============================================================
+function calcScore(yaku, fu, han) {
+  const totalHan = yaku.reduce((s,y)=>s+y.han,0);
+  if (yaku.some(y=>y.han>=13)) return { basicPoints:8000, totalHan:13, fu:30, yakuman:true };
+  if (totalHan >= 13) return { basicPoints:8000, totalHan, fu, yakuman:true };
+  if (totalHan >= 5) {
+    const tbl = totalHan>=13?8000:totalHan>=11?6000:totalHan>=8?4000:totalHan>=6?3000:2000;
+    return { basicPoints:tbl, totalHan, fu, mangan:true };
+  }
+  return { basicPoints: Math.min(fu * Math.pow(2, totalHan+2), 8000), totalHan, fu };
+}
+
+function calcFu(tiles, context) {
+  if (isChiitoitsu(sortTiles(tiles))) return 25;
+  if (isKokushi(sortTiles(tiles))) return 30;
+  return context.tsumo && !context.riichi ? 20 : 30;
+}
+
+// ============================================================
+// CANDIDATES
+// ============================================================
+function analyzeCandidates(playerIdx) {
+  const hand = G.players[playerIdx].hand;
+  const tsumo = G.tsumoTile;
+  const fullHand = tsumo ? [...hand, tsumo] : [...hand];
+  const candidates = []; const seen = new Set();
+  for (const tile of fullHand) {
+    const key = tileKey(tile);
+    if (seen.has(key)) continue; seen.add(key);
+    let removed = false;
+    const remaining = fullHand.filter(t => { if (!removed && t.id===tile.id) { removed=true; return false; } return true; });
+    const shanten = calcShanten(remaining);
+    const context = getPlayerContext(playerIdx);
+    const yaku = shanten === -1 ? detectYaku(remaining, G.players[playerIdx], context) : [];
+    candidates.push({ tile, shanten, yaku, display: tileDisplay(tile) });
+  }
+  candidates.sort((a,b) => a.shanten-b.shanten || a.tile.suit.localeCompare(b.tile.suit) || a.tile.num-b.tile.num);
+  return candidates.slice(0, 6);
+}
+
+function getPlayerContext(playerIdx) {
+  const p = G.players[playerIdx];
+  return { riichi:p.riichi, tsumo:false, seat_wind:p.wind, round_wind:G.roundWindName, melds:p.melds };
+}
+
+// ============================================================
+// CPU AI
+// ============================================================
+function cpuTurn(playerIdx) {
+  const algo = document.getElementById('cpuAlgo').value;
+  const p = G.players[playerIdx];
+  setTimeout(() => {
+    if (G.gameOver) return;
+    let discardIdx;
+    if (algo === 'random') discardIdx = p.hand.length - 1;
+    else if (algo === 'defense') discardIdx = findSafestDiscard(playerIdx);
+    else discardIdx = findBestDiscard(playerIdx);
+
+    const discardTile = p.hand[discardIdx];
+    p.hand.splice(discardIdx, 1);
+    p.discards.push(discardTile);
+    addLog(`${p.name}が ${renderTileText(discardTile)} を捨てた`, 'cpu');
+
+    G.currentTurn = (G.currentTurn + 1) % G.playerCount;
+    if (G.currentTurn === 0) {
+      drawTile(0);
+      G.phase = 'player_draw';
+      updateUI();
+    } else {
+      drawTile(G.currentTurn);
+      const cpuHand = getPlayerHand(G.currentTurn);
+      if (cpuHand.length === 14 && checkAgari(cpuHand) && Math.random() < 0.05) {
+        handleCpuWin(G.currentTurn, cpuHand, 'tsumo'); return;
+      }
+      cpuTurn(G.currentTurn);
+    }
+  }, 500);
+}
+
+function findBestDiscard(playerIdx) {
+  const p = G.players[playerIdx];
+  let bestIdx = 0, bestShanten = Infinity;
+  for (let i = 0; i < p.hand.length; i++) {
+    const sh = calcShanten(p.hand.filter((_,j)=>j!==i));
+    if (sh < bestShanten) { bestShanten = sh; bestIdx = i; }
+  }
+  return bestIdx;
+}
+
+function findSafestDiscard(playerIdx) {
+  const safeKeys = new Set();
+  G.players.forEach((p, i) => { if (i!==playerIdx) p.discards.forEach(t=>safeKeys.add(tileKey(t))); });
+  const p = G.players[playerIdx];
+  for (let i = 0; i < p.hand.length; i++) { if (safeKeys.has(tileKey(p.hand[i]))) return i; }
+  return findBestDiscard(playerIdx);
+}
+
+function handleCpuWin(playerIdx, hand, type) {
+  const p = G.players[playerIdx];
+  const context = getPlayerContext(playerIdx);
+  context.tsumo = type === 'tsumo';
+  const yaku = detectYaku(hand, p, context);
+  if (yaku.length === 0) return;
+  const han = yaku.reduce((s,y)=>s+y.han,0);
+  const fu = calcFu(hand, context);
+  const { basicPoints } = calcScore(yaku, fu, han);
+  const pts = basicPoints * (type==='tsumo' ? 2 : 4);
+  p.score += pts;
+  G.players[0].score -= Math.floor(pts/3);
+  G.gameOver = true;
+  addLog(`${p.name}が${type==='tsumo'?'ツモ':'ロン'}! ${han}翻`, 'win');
+  updateUI();
+  showNotification(`${p.name}が${type==='tsumo'?'ツモ':'ロン'}アガリ！`);
+  saveGameState();
+}
+
+// ============================================================
+// PLAYER ACTIONS
+// ============================================================
+function discardTile(tile) {
+  if (G.phase !== 'player_draw' && G.phase !== 'discard') return;
+  if (G.players[0].riichi && G.tsumoTile && tile.id !== G.tsumoTile.id) {
+    showNotification('リーチ中はツモ切りのみです'); return;
+  }
+  const p = G.players[0];
+  const fullHand = G.tsumoTile ? [...p.hand, G.tsumoTile] : [...p.hand];
+  if (!fullHand.find(t => t.id === tile.id)) return;
+
+  if (G.tsumoTile && tile.id === G.tsumoTile.id) {
+    G.tsumoTile = null;
+  } else {
+    const handIdx = p.hand.findIndex(t => t.id === tile.id);
+    p.hand.splice(handIdx, 1);
+    if (G.tsumoTile) { p.hand.push(G.tsumoTile); G.tsumoTile = null; }
+  }
+
+  p.discards.push(tile);
+  addLog(`あなたが ${renderTileText(tile)} を捨てた`);
+
+  for (let i = 1; i < G.playerCount; i++) {
+    const cpuHand = [...G.players[i].hand, tile];
+    if (cpuHand.length === 14 && checkAgari(cpuHand) && Math.random() < 0.1) {
+      handleCpuWin(i, cpuHand, 'ron'); return;
+    }
+  }
+
+  G.currentTurn = 1; G.phase = 'cpu';
+  updateUI();
+  saveGameState();
+  cpuTurn(1);
+}
+
+function declareTsumo() {
+  const fullHand = getPlayerHand(0);
+  const agari = checkAgari(fullHand);
+  if (!agari) return;
+  const p = G.players[0];
+  const context = getPlayerContext(0); context.tsumo = true;
+  const yaku = detectYaku(fullHand, p, context);
+  if (yaku.length === 0) { showNotification('役がありません！'); return; }
+  const han = yaku.reduce((s,y)=>s+y.han,0);
+  const fu = calcFu(fullHand, context);
+  showResultModal(fullHand, yaku, han, fu, 'ツモ', null);
+  G.gameOver = true;
+  const basicPts = Math.min(fu * Math.pow(2, han+2), 8000);
+  const tsumoPts = Math.ceil(basicPts/100)*100;
+  for (let i = 1; i < G.playerCount; i++) {
+    G.players[i].score -= tsumoPts;
+    p.score += tsumoPts;
+  }
+  addLog(`ツモ! ${han}翻${fu}符`, 'win');
+  saveGameState();
+}
+
+function declareRon() { showNotification('ロン（CPU捨て後に自動判定）'); }
+function declareRiichi() {
+  const p = G.players[0];
+  const fullHand = getPlayerHand(0);
+  if (p.score < 1000) { showNotification('点数が足りません'); return; }
+  const sh = calcShanten(fullHand);
+  if (sh > 0) { showNotification('テンパイしていません'); return; }
+  p.riichi = true; p.score -= 1000; G.riichiPot += 1000;
+  addLog('リーチ！', 'riichi');
+  showNotification('リーチ！');
+  updateUI();
+  saveGameState();
+}
+
+function declareChi() { showNotification('チー（実装中）'); }
+function declarePon() { showNotification('ポン（実装中）'); }
+function declareKan() { showNotification('カン（実装中）'); }
+function skipAction() { updateUI(); }
+
+function handleRyuukyoku() {
+  G.gameOver = true;
+  addLog('流局', 'system');
+  showNotification('流局');
+  updateUI();
+  saveGameState();
+  setTimeout(() => {
+    showModal('流局', `<div class="result-display">
+      <div style="font-size:2rem;color:var(--gold);margin-bottom:14px;">流局</div>
+      <p style="color:rgba(232,224,208,0.7);">山牌が尽きました。</p>
+      <div style="margin-top:18px;display:flex;gap:10px;justify-content:center;">
+        <button class="btn" onclick="newGame()">次の局へ</button>
+        <button class="btn" onclick="closeModal()">閉じる</button>
+      </div>
+    </div>`);
+  }, 800);
+}
+
+// ============================================================
+// UI RENDERING
+// ============================================================
+function renderTile(tile, size='lg', extra='') {
+  const d = tileDisplay(tile);
+  return `<div class="tile tile-${size} ${extra}" onclick="discardTile(getTileById(${tile.id}))" data-id="${tile.id}">
+    <span class="${d.color}">${d.text}</span>
+  </div>`;
+}
+
+function renderSmallTile(tile, size='sm') {
+  const d = tileDisplay(tile);
+  return `<div class="tile tile-${size}"><span class="${d.color}">${d.text}</span></div>`;
+}
+
+function renderTileText(tile) { return tileDisplay(tile).text; }
+
+function getTileById(id) {
+  if (!G) return null;
+  const allTiles = [...G.players[0].hand, ...(G.tsumoTile ? [G.tsumoTile] : [])];
+  return allTiles.find(t => t.id === id) || null;
+}
+window.getTileById = getTileById;
+
+function updateUI() {
+  if (!G) return;
+  renderPlayerHand();
+  renderCpuPlayers();
+  renderDoraDisplay();
+  renderScorePanel();
+  renderActionButtons();
+  renderCandidates();
+  document.getElementById('yamaCount').textContent = G.yama.length;
+  const rounds = ['東1局','東2局','東3局','東4局','南1局','南2局','南3局','南4局'];
+  document.getElementById('roundDisplay').textContent = rounds[G.round-1] || `第${G.round}局`;
+  document.getElementById('roundWind').textContent = G.roundWindName;
+  document.getElementById('honbaDisplay').textContent = `本場:${G.honba} / R棒:${G.riichiPot/1000}`;
+}
+
+function renderPlayerHand() {
+  const p = G.players[0];
+  const hand = sortTiles(p.hand);
+  const tsumo = G.tsumoTile;
+  const fullHand = tsumo ? [...hand, tsumo] : [...hand];
+  const sh = calcShanten(fullHand);
+
+  let html = '';
+  for (const t of hand) html += renderTile(t, 'lg', '');
+  if (tsumo) html += renderTile(tsumo, 'lg', 'tsumo');
+  document.getElementById('playerHand').innerHTML = html;
+
+  document.getElementById('tenpaiIndicator').classList.toggle('hidden', sh > 0);
+  document.getElementById('riichiIndicator').classList.toggle('hidden', !p.riichi);
+  document.getElementById('playerDiscard').innerHTML = p.discards.map(t=>renderSmallTile(t,'sm')).join('');
+  document.getElementById('playerScore').textContent = p.score.toLocaleString() + '点';
+  document.getElementById('playerWind').textContent = p.wind;
+}
+
+function renderCpuPlayers() {
+  for (let i = 1; i < G.playerCount; i++) {
+    const p = G.players[i];
+    document.getElementById(`tiles${i}`).innerHTML = Array(p.hand.length).fill('<div class="cpu-tile-back"></div>').join('');
+    document.getElementById(`score${i}`).textContent = p.score.toLocaleString()+'点';
+    document.getElementById(`wind${i}`).textContent = p.wind;
+    document.getElementById(`discard${i}`).innerHTML = p.discards.map(t=>renderSmallTile(t,'xs')).join('');
+    const ri = document.getElementById(`riichi${i}`);
+    if (ri) ri.innerHTML = p.riichi ? '<span class="riichi-indicator">R</span>' : '';
+  }
+  if (G.playerCount === 3) {
+    const el = document.getElementById('cpu3');
+    if (el) el.style.visibility = 'hidden';
+  } else {
+    const el = document.getElementById('cpu3');
+    if (el) el.style.visibility = '';
+  }
+}
+
+function renderDoraDisplay() {
+  document.getElementById('doraDisplay').innerHTML = G.dora.map(t=>renderSmallTile(t,'md')).join('');
+}
+
+function renderScorePanel() {
+  document.getElementById('scorePanel').innerHTML = G.players.map(p => `
+    <div class="score-row">
+      <div class="score-name">
+        <span class="wind-badge" style="font-size:0.62rem;">${p.wind}</span>
+        ${p.name}${p.riichi?'<span style="color:#9b59b6;font-size:0.68rem;"> R</span>':''}
+      </div>
+      <div style="font-weight:700;font-size:0.95rem;color:var(--ivory);">${p.score.toLocaleString()}</div>
+    </div>
+  `).join('');
+}
+
+function renderActionButtons() {
+  const isPlayerTurn = G.phase === 'player_draw';
+  const fullHand = getPlayerHand(0);
+  const sh = calcShanten(fullHand);
+  const agari = fullHand.length === 14 && checkAgari(fullHand);
+  const p = G.players[0];
+
+  document.getElementById('btnTsumo').disabled = !isPlayerTurn || !agari;
+  document.getElementById('btnRiichi').disabled = !isPlayerTurn || sh > 0 || p.riichi || p.score < 1000;
+  document.getElementById('btnRon').disabled = true;
+  document.getElementById('btnChi').disabled = true;
+  document.getElementById('btnPon').disabled = true;
+  document.getElementById('btnKan').disabled = true;
+  document.getElementById('btnSkip').disabled = isPlayerTurn;
+
+  document.getElementById('statusMsg').textContent =
+    G.gameOver ? 'ゲーム終了' :
+    isPlayerTurn ? (G.tsumoTile ? '捨てる牌を選んでください' : 'ツモ待ち...') :
+    'CPUのターン...';
+}
+
+function renderCandidates() {
+  const list = document.getElementById('candidateList');
+  if (G.phase !== 'player_draw' || G.gameOver) {
+    list.innerHTML = '<div style="font-size:0.72rem;color:rgba(232,224,208,0.35);text-align:center;padding:8px;">プレイヤーのターン時に表示</div>';
+    return;
+  }
+  const candidates = analyzeCandidates(0);
+  list.innerHTML = candidates.map((c, i) => {
+    const isBest = i === 0;
+    const shantenText = c.shanten===-1?'<span style="color:#2ecc71">アガリ</span>':c.shanten===0?'<span style="color:#f39c12">テンパイ</span>':`${c.shanten}シャンテン`;
+    const d = c.display;
+    return `<div class="candidate-item ${isBest?'best':''}" onclick="highlightCandidate(${c.tile.id})">
+      <div class="candidate-rank ${isBest?'best':''}">${isBest?'★':i+1}</div>
+      <div><div class="tile tile-sm"><span class="${d.color}">${d.text}</span></div></div>
+      <div class="candidate-info">
+        <div class="candidate-shanten">${shantenText}</div>
+        <div class="candidate-yaku">${c.yaku.map(y=>y.name).join('・')||'役なし'}</div>
+      </div>
+      <button class="candidate-detail-btn" onclick="showCandidateDetail(${c.tile.id},event)">詳細</button>
+    </div>`;
+  }).join('');
+}
+
+function highlightCandidate(tileId) {
+  document.querySelectorAll('#playerHand .tile').forEach(el => el.classList.remove('selected','candidate-best'));
+  const el = document.querySelector(`#playerHand [data-id="${tileId}"]`);
+  if (el) el.classList.add('selected', 'candidate-best');
+}
+
+// ============================================================
+// MODALS
+// ============================================================
+function showModal(title, bodyHTML) {
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalBody').innerHTML = bodyHTML;
+  document.getElementById('modalOverlay').classList.remove('hidden');
+}
+
+function closeModal(event) {
+  if (event && event.target !== document.getElementById('modalOverlay')) return;
+  document.getElementById('modalOverlay').classList.add('hidden');
+}
+
+function showResultModal(hand, yaku, han, fu, type, loser) {
+  const { basicPoints, yakuman } = calcScore(yaku, fu, han);
+  const totalHan = yaku.reduce((s,y)=>s+y.han,0);
+  const pts = Math.ceil(basicPoints * 4 / 100) * 100;
+  let hanLabel = yakuman||totalHan>=13 ? '役満' : totalHan>=11?'三倍満':totalHan>=8?'倍満':totalHan>=6?'跳満':totalHan>=5?'満貫':`${totalHan}翻${fu}符`;
+  showModal(type, `<div class="result-display">
+    <div class="result-type">${type}</div>
+    <div class="result-hand-display">${sortTiles(hand).map(t=>{const d=tileDisplay(t);return`<div class="tile tile-md"><span class="${d.color}">${d.text}</span></div>`;}).join('')}</div>
+    <div class="result-yaku-list">${yaku.map(y=>`<div class="result-yaku-item"><span>${y.name}</span><span style="color:var(--gold)">${y.han>=13?'役満':y.han+'翻'}</span></div>`).join('')}</div>
+    <div class="result-fu">${hanLabel}</div>
+    <div class="result-total">+${pts.toLocaleString()}点</div>
+    <div style="margin-top:18px;display:flex;gap:10px;justify-content:center;">
+      <button class="btn" onclick="newGame()">次の局へ</button>
+      <button class="btn" onclick="closeModal()">閉じる</button>
+    </div>
+  </div>`);
+}
+
+function showCandidateDetail(tileId, event) {
+  event.stopPropagation();
+  const fullHand = getPlayerHand(0);
+  const tile = fullHand.find(t => t.id === tileId);
+  if (!tile) return;
+  const remaining = fullHand.filter(t => t.id !== tileId);
+  const sh = calcShanten(remaining);
+  const d = tileDisplay(tile);
+
+  let waitInfo = '';
+  if (sh === 0) {
+    const waits = [];
+    const allKeys = [];
+    for (const suit of ['man','pin','sou']) for (let n = 1; n <= 9; n++) allKeys.push({suit,num:n});
+    for (let n = 1; n <= 7; n++) allKeys.push({suit:'jihai',num:n});
+    for (const key of allKeys) {
+      const testHand = [...remaining, {...key, id:9999}];
+      if (testHand.length === 14 && checkAgari(testHand)) waits.push(key);
+    }
+    if (waits.length > 0) {
+      waitInfo = `<div class="detail-section"><div class="detail-title">待ち牌</div>
+        <div style="display:flex;gap:3px;flex-wrap:wrap;">${waits.map(w=>{const wd=tileDisplay(w);return`<div class="tile tile-sm"><span class="${wd.color}">${wd.text}</span></div>`;}).join('')}</div></div>`;
+    }
+  }
+
+  const context = getPlayerContext(0);
+  const yaku = sh === -1 ? detectYaku(remaining, G.players[0], context) : [];
+
+  showModal(`捨て牌分析: ${d.text}`, `
+    <div class="detail-section">
+      <div class="detail-title">捨てた後の手牌</div>
+      <div class="hand-example">${sortTiles(remaining).map(t=>{const rd=tileDisplay(t);return`<div class="tile tile-sm"><span class="${rd.color}">${rd.text}</span></div>`;}).join('')}</div>
+    </div>
+    <div class="detail-section">
+      <div class="detail-title">シャンテン数</div>
+      <p style="color:${sh===-1?'#2ecc71':sh===0?'#f39c12':'var(--ivory)'};font-size:1.1rem;font-weight:700;">
+        ${sh===-1?'アガリ形':sh===0?'テンパイ':`${sh}シャンテン`}</p>
+    </div>
+    ${waitInfo}
+    ${yaku.length>0?`<div class="detail-section"><div class="detail-title">成立する役</div>
+      ${yaku.map(y=>`<div style="display:flex;justify-content:space-between;padding:5px 9px;background:rgba(255,255,255,0.05);border-radius:4px;margin-bottom:3px;">
+        <span>${y.name}</span><span style="color:var(--gold)">${y.han}翻</span></div>`).join('')}
+    </div>`:''}
+  `);
+}
+
+// ============================================================
+// YAKU LIST
+// ============================================================
+const YAKU_DATA = [
+  { category:'一翻役（鳴きあり）', items:[
+    { name:'断幺九', han:'1翻(鳴き0)', desc:'1・9・字牌を一切含まない手。初心者向けの基本役。' },
+    { name:'役牌（白）', han:'1翻', desc:'白を3枚揃えた刻子。' },
+    { name:'役牌（発）', han:'1翻', desc:'発を3枚揃えた刻子。' },
+    { name:'役牌（中）', han:'1翻', desc:'中を3枚揃えた刻子。' },
+    { name:'役牌（場風）', han:'1翻', desc:'現在の場風牌（例:東場なら東）を3枚揃える。' },
+    { name:'役牌（門風）', han:'1翻', desc:'自分の門風牌（自風）を3枚揃える。' },
+  ]},
+  { category:'一翻役（門前のみ）', items:[
+    { name:'リーチ', han:'1翻', desc:'テンパイ時に宣言。1000点供託。裏ドラが乗る可能性あり。' },
+    { name:'門前清自摸和', han:'1翻', desc:'門前でツモアガリ。' },
+    { name:'平和', han:'1翻', desc:'4面子すべて順子、雀頭が役牌以外、両面待ち。符が20符固定。' },
+    { name:'一盃口', han:'1翻', desc:'同種・同数字の順子が2組。門前限定。' },
+    { name:'立直一発', han:'1翻', desc:'リーチ後、最初のツモ/ロンでアガリ。' },
+  ]},
+  { category:'二翻役', items:[
+    { name:'七対子', han:'2翻', desc:'7種類の対子で構成。25符固定。鳴き不可。' },
+    { name:'対々和', han:'2翻', desc:'4面子すべて刻子。' },
+    { name:'三色同順', han:'2翻(1)', desc:'マン・ピン・ソーで同数字の順子3組。' },
+    { name:'三色同刻', han:'2翻', desc:'マン・ピン・ソーで同数字の刻子3組。' },
+    { name:'一気通貫', han:'2翻(1)', desc:'同種で1-2-3、4-5-6、7-8-9の順子3組。' },
+    { name:'混全帯幺九', han:'2翻(1)', desc:'全面子と雀頭に1・9・字牌を含む。' },
+    { name:'三暗刻', han:'2翻', desc:'3組の暗刻。' },
+    { name:'小三元', han:'2翻', desc:'三元牌2種を刻子、1種を雀頭。' },
+  ]},
+  { category:'三翻役', items:[
+    { name:'混一色', han:'3翻(2)', desc:'1種類の数牌と字牌のみで構成。' },
+    { name:'純全帯幺九', han:'3翻(2)', desc:'全面子と雀頭に1・9牌（字牌なし）。' },
+    { name:'二盃口', han:'3翻', desc:'一盃口が2組。門前限定。' },
+  ]},
+  { category:'六翻役', items:[
+    { name:'清一色', han:'6翻(5)', desc:'1種類の数牌のみで構成。' },
+  ]},
+  { category:'役満', items:[
+    { name:'国士無双', han:'役満', desc:'1・9・字牌の13種各1枚＋そのうち1枚対子。' },
+    { name:'四暗刻', han:'役満', desc:'4組すべて暗刻。ツモ限定。' },
+    { name:'大三元', han:'役満', desc:'白・発・中すべて刻子。' },
+    { name:'字一色', han:'役満', desc:'字牌のみ。' },
+    { name:'緑一色', han:'役満', desc:'発・ソー2346 8のみ。' },
+    { name:'清老頭', han:'役満', desc:'1・9牌のみ。' },
+    { name:'九蓮宝燈', han:'役満', desc:'同種で1112345678999＋1枚。' },
+    { name:'天和', han:'役満', desc:'親の配牌14枚でアガリ。' },
+    { name:'地和', han:'役満', desc:'子の第1ツモでアガリ。' },
+  ]},
+];
+
+function openYakuList() {
+  showModal('役一覧', YAKU_DATA.map(cat=>`
+    <div class="yaku-category">
+      <div class="yaku-cat-title">${cat.category}</div>
+      <div class="yaku-grid">${cat.items.map(y=>`
+        <div class="yaku-card">
+          <div class="yaku-name">${y.name}</div>
+          <div class="yaku-han">${y.han}</div>
+          <div class="yaku-desc">${y.desc}</div>
+        </div>`).join('')}
+      </div>
+    </div>`).join(''));
+}
+
+// ============================================================
+// NOTIFICATIONS & LOG
+// ============================================================
+let notifTimeout;
+function showNotification(msg) {
+  const existing = document.querySelector('.notification');
+  if (existing) existing.remove();
+  if (notifTimeout) clearTimeout(notifTimeout);
+  const el = document.createElement('div');
+  el.className = 'notification'; el.textContent = msg;
+  document.body.appendChild(el);
+  notifTimeout = setTimeout(() => el.remove(), 3000);
+}
+
+function addLog(msg, type='normal') {
+  const log = document.getElementById('gameLog');
+  const item = document.createElement('div');
+  item.className = `log-item ${type}`; item.textContent = msg;
+  log.insertBefore(item, log.firstChild);
+  if (log.children.length > 30) log.lastChild.remove();
+}
+
+// ============================================================
+// GAME CONTROL
+// ============================================================
+function setGameType(type) {
+  gameType = type;
+  document.getElementById('s-4ma').classList.toggle('active', type===4);
+  document.getElementById('s-3ma').classList.toggle('active', type===3);
+  try { localStorage.setItem('mahjong_gametype', type); } catch(e) {}
+  newGame();
+}
+
+function newGame() {
+  document.getElementById('gameLog').innerHTML = '';
+  initGame();
+  updateUI();
+  addLog('ゲーム開始', 'system');
+  updateUI();
+}
+
+// ============================================================
+// INIT
+// ============================================================
+window.addEventListener('load', () => {
+  // Try to restore saved layout preference
+  let savedLayout = null;
+  try {
+    savedLayout = localStorage.getItem('mahjong_layout');
+    const savedType = localStorage.getItem('mahjong_gametype');
+    if (savedType) gameType = parseInt(savedType);
+    const savedCpu = localStorage.getItem('mahjong_cpu');
+    if (savedCpu) document.getElementById('cpuAlgo').value = savedCpu;
+  } catch(e) {}
+
+  // Check if we can restore a game
+  const restoredLayout = loadGameState();
+
+  if (savedLayout || restoredLayout) {
+    const layout = restoredLayout || savedLayout;
+    // Show layout selector briefly then auto-select
+    if (restoredLayout) {
+      // Restore the saved game
+      selectLayout(layout);
+      updateUI();
+      showNotification('前回のゲームを復元しました');
+    } else {
+      // Just remember layout preference but still show selector
+      // (pre-highlight the saved choice)
+    }
+  }
+});
+</script>
+</body>
+</html>
