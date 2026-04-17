@@ -753,6 +753,15 @@ body.layout-mobile .action-btn {
   background:rgba(255,255,255,0.03);padding:9px;border-radius:4px;
 }
 
+/* Hand structure groups */
+.hand-struct { display:flex; flex-wrap:wrap; gap:5px; }
+.hand-struct-group {
+  display:flex; flex-direction:column; align-items:center; gap:2px;
+  border:1px solid; border-radius:4px; padding:4px 4px 2px;
+}
+.hand-struct-tiles { display:flex; gap:1px; }
+.hand-struct-label { font-size:0.55rem; letter-spacing:0.02em; }
+
 /* Notification */
 .notification{
   position:fixed; top:72px; left:50%; transform:translateX(-50%);
@@ -1905,6 +1914,11 @@ function discardTile(tile) {
   }
 
   G.currentTurn = 1; G.phase = 'cpu';
+  drawTile(1);
+  const cpu1Hand = getPlayerHand(1);
+  if (cpu1Hand.length === 14 && checkAgari(cpu1Hand) && Math.random() < 0.05) {
+    handleCpuWin(1, cpu1Hand, 'tsumo'); return;
+  }
   updateUI();
   saveGameState();
   cpuTurn(1);
@@ -2148,6 +2162,80 @@ function showResultModal(hand, yaku, han, fu, type, loser) {
   </div>`);
 }
 
+function getHandGroups(tiles) {
+  const sorted = sortTiles([...tiles]);
+  const used = new Array(sorted.length).fill(false);
+  const groups = [];
+
+  // Phase 1: kou (triplets)
+  for (let i = 0; i < sorted.length; i++) {
+    if (used[i]) continue;
+    const same = [];
+    for (let j = i; j < sorted.length; j++) {
+      if (!used[j] && tileKey(sorted[j]) === tileKey(sorted[i])) same.push(j);
+    }
+    if (same.length >= 3) {
+      same.slice(0, 3).forEach(j => { used[j] = true; });
+      groups.push({ role: 'mentsu', type: 'kou', tiles: same.slice(0, 3).map(j => sorted[j]) });
+    }
+  }
+
+  // Phase 2: jun (complete sequences)
+  for (let i = 0; i < sorted.length; i++) {
+    if (used[i] || sorted[i].suit === 'jihai') continue;
+    const t = sorted[i];
+    const j2 = sorted.findIndex((x, k) => k > i && !used[k] && x.suit === t.suit && x.num === t.num + 1);
+    const j3 = j2 >= 0 ? sorted.findIndex((x, k) => k > j2 && !used[k] && x.suit === t.suit && x.num === t.num + 2) : -1;
+    if (j2 >= 0 && j3 >= 0) {
+      [i, j2, j3].forEach(j => { used[j] = true; });
+      groups.push({ role: 'mentsu', type: 'jun', tiles: [sorted[i], sorted[j2], sorted[j3]] });
+    }
+  }
+
+  // Phase 3: pairs (taatsu)
+  for (let i = 0; i < sorted.length; i++) {
+    if (used[i]) continue;
+    const j = sorted.findIndex((x, k) => k > i && !used[k] && tileKey(x) === tileKey(sorted[i]));
+    if (j >= 0) {
+      used[i] = used[j] = true;
+      groups.push({ role: 'taatsu', type: 'pair', tiles: [sorted[i], sorted[j]] });
+    }
+  }
+
+  // Phase 4: adjacent/kanchan sequences (taatsu)
+  for (let i = 0; i < sorted.length; i++) {
+    if (used[i] || sorted[i].suit === 'jihai') continue;
+    const t = sorted[i];
+    const ja = sorted.findIndex((x, k) => k > i && !used[k] && x.suit === t.suit && x.num === t.num + 1);
+    if (ja >= 0) { used[i] = used[ja] = true; groups.push({ role: 'taatsu', type: 'adj', tiles: [sorted[i], sorted[ja]] }); continue; }
+    const jk = sorted.findIndex((x, k) => k > i && !used[k] && x.suit === t.suit && x.num === t.num + 2);
+    if (jk >= 0) { used[i] = used[jk] = true; groups.push({ role: 'taatsu', type: 'kan', tiles: [sorted[i], sorted[jk]] }); }
+  }
+
+  // Phase 5: isolated
+  sorted.forEach((t, i) => { if (!used[i]) groups.push({ role: 'isolated', tiles: [t] }); });
+
+  return groups;
+}
+
+function renderHandStructure(tiles) {
+  const groups = getHandGroups(tiles);
+  const tileH = t => { const d = tileDisplay(t); return `<div class="tile tile-sm"><span class="${d.color}">${d.text}</span></div>`; };
+  const cfg = {
+    mentsu: { color: '#2ecc71', labels: { kou: '刻子', jun: '順子' } },
+    taatsu: { color: '#f39c12', labels: { pair: '対子', adj: '両面', kan: '嵌張' } },
+    isolated: { color: 'rgba(232,224,208,0.3)', labels: {} }
+  };
+  return `<div class="hand-struct">${groups.map(g => {
+    const c = cfg[g.role];
+    const label = g.role === 'isolated' ? '孤立' : (c.labels[g.type] || '');
+    return `<div class="hand-struct-group" style="border-color:${c.color}">
+      <div class="hand-struct-tiles">${g.tiles.map(tileH).join('')}</div>
+      <div class="hand-struct-label" style="color:${c.color}">${label}</div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
 function tryFormMentsuGroups(tiles) {
   if (tiles.length === 0) return [];
   const sorted = sortTiles(tiles);
@@ -2227,7 +2315,9 @@ function showCandidateDetail(tileId, event) {
 
   const shantenHTML = `<div class="detail-section">
     <div class="detail-title">シャンテン数</div>
-    <p style="color:${shantenColor};font-size:1.1rem;font-weight:700;">${shantenLabel}</p>
+    <p style="color:${shantenColor};font-size:1.1rem;font-weight:700;margin-bottom:8px;">${shantenLabel}</p>
+    <div class="detail-title" style="margin-top:6px;">手牌の構造</div>
+    ${renderHandStructure(remaining)}
   </div>`;
 
   let tenpaiHTML = '';
