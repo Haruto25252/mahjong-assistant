@@ -1428,6 +1428,7 @@ function initGame() {
 
   assignWinds();
   drawTile(0);
+  G.phase = 'player_draw';
 }
 
 function assignWinds() {
@@ -1833,7 +1834,7 @@ function handleCpuWin(playerIdx, hand, type) {
 // PLAYER ACTIONS
 // ============================================================
 function discardTile(tile) {
-  if (G.phase !== 'player_draw' && G.phase !== 'discard') return;
+  if (G.phase !== 'player_draw' && G.phase !== 'discard' && G.phase !== 'draw') return;
   if (G.players[0].riichi && G.tsumoTile && tile.id !== G.tsumoTile.id) {
     showNotification('リーチ中はツモ切りのみです'); return;
   }
@@ -1943,8 +1944,9 @@ function renderTileText(tile) { return tileDisplay(tile).text; }
 
 function getTileById(id) {
   if (!G) return null;
+  const numId = Number(id);
   const allTiles = [...G.players[0].hand, ...(G.tsumoTile ? [G.tsumoTile] : [])];
-  return allTiles.find(t => t.id === id) || null;
+  return allTiles.find(t => t.id === numId) || null;
 }
 window.getTileById = getTileById;
 
