@@ -366,7 +366,7 @@ body.layout-mobile .mobile-tab-bar { display:flex; }
 .mob-tab-icon { font-size:1.3rem; }
 
 /* ===== GAME AREA ===== */
-.game-area { display:flex; flex-direction:column; gap:10px; }
+.game-area { display:flex; flex-direction:column; gap:10px; flex:1; }
 
 /* ===== TABLE ===== */
 .table {
@@ -564,7 +564,46 @@ body.layout-mobile .action-btn {
 .action-riichi:hover{background:var(--gold);color:var(--green);}
 .action-skip{border-color:rgba(232,224,208,0.4);color:rgba(232,224,208,0.4);}
 .action-skip:hover{background:rgba(232,224,208,0.1);}
-.action-btn:disabled{opacity:0.2;cursor:not-allowed;pointer-events:none;}
+.action-btn:disabled{opacity:0.35;cursor:not-allowed;pointer-events:none;}
+
+.tile.pending-riichi {
+  border-color:var(--gold) !important;
+  box-shadow:2px 2px 0 rgba(0,0,0,0.3), 0 0 14px rgba(200,168,75,0.9) !important;
+  animation:pulse-gold-tile 0.8s infinite;
+}
+@keyframes pulse-gold-tile {
+  0%,100%{box-shadow:2px 2px 0 rgba(0,0,0,0.3),0 0 8px rgba(200,168,75,0.6);}
+  50%{box-shadow:2px 2px 0 rgba(0,0,0,0.3),0 0 20px rgba(200,168,75,1);}
+}
+
+/* Riichi info panel */
+.riichi-info-panel {
+  background:rgba(200,168,75,0.07);
+  border:1px solid rgba(200,168,75,0.45);
+  border-radius:8px; overflow:hidden;
+}
+.riichi-info-header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:10px 14px; cursor:pointer;
+  transition:background 0.15s;
+}
+.riichi-info-header:hover { background:rgba(200,168,75,0.08); }
+.riichi-header-label {
+  font-family:'Zen Antique',serif;
+  font-size:0.88rem; color:var(--gold); font-weight:700; letter-spacing:0.12em;
+}
+.riichi-waits-row { display:flex; gap:3px; align-items:center; flex-wrap:wrap; }
+.riichi-toggle-btn {
+  font-size:0.72rem; color:rgba(200,168,75,0.7);
+  border:1px solid rgba(200,168,75,0.3); background:transparent;
+  padding:4px 10px; border-radius:3px; cursor:pointer; white-space:nowrap;
+  transition:all 0.15s;
+}
+.riichi-toggle-btn:hover { background:rgba(200,168,75,0.12); color:var(--gold); }
+.riichi-detail-body {
+  padding:14px 16px;
+  border-top:1px solid rgba(200,168,75,0.2);
+}
 
 /* Status */
 .status-msg {
@@ -947,14 +986,26 @@ body.search-mode *::selection {
     <div class="status-msg" id="statusMsg">牌を選択して捨ててください</div>
 
     <!-- Actions -->
-    <div class="action-bar">
-      <button class="action-btn action-tsumo" id="btnTsumo" onclick="declareTsumo()" disabled>ツモ</button>
-      <button class="action-btn action-ron" id="btnRon" onclick="declareRon()" disabled>ロン</button>
-      <button class="action-btn action-riichi" id="btnRiichi" onclick="declareRiichi()" disabled>リーチ</button>
-      <button class="action-btn action-chi" id="btnChi" onclick="declareChi()" disabled>チー</button>
-      <button class="action-btn action-pon" id="btnPon" onclick="declarePon()" disabled>ポン</button>
-      <button class="action-btn action-kan" id="btnKan" onclick="declareKan()" disabled>カン</button>
-      <button class="action-btn action-skip" id="btnSkip" onclick="skipAction()" disabled>スキップ</button>
+    <div class="action-bar" id="actionBar" style="display:none">
+      <button class="action-btn action-tsumo" id="btnTsumo" onclick="declareTsumo()" style="display:none">ツモ</button>
+      <button class="action-btn action-ron" id="btnRon" onclick="declareRon()" style="display:none">ロン</button>
+      <button class="action-btn action-riichi" id="btnRiichi" onclick="declareRiichi()" style="display:none">リーチ</button>
+      <button class="action-btn action-chi" id="btnChi" onclick="declareChi()" style="display:none">チー</button>
+      <button class="action-btn action-pon" id="btnPon" onclick="declarePon()" style="display:none">ポン</button>
+      <button class="action-btn action-kan" id="btnKan" onclick="declareKan()" style="display:none">カン</button>
+      <button class="action-btn action-skip" id="btnSkip" onclick="skipAction()" style="display:none">スキップ</button>
+    </div>
+
+    <!-- Riichi info panel -->
+    <div id="riichiInfoPanel" class="riichi-info-panel hidden">
+      <div class="riichi-info-header" onclick="toggleRiichiDetail()">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span class="riichi-header-label">リーチ中</span>
+          <div class="riichi-waits-row" id="riichiWaitsRow"></div>
+        </div>
+        <button class="riichi-toggle-btn" id="riichiDetailToggle">詳細 ▼</button>
+      </div>
+      <div id="riichiDetail" class="riichi-detail-body hidden"></div>
     </div>
   </div>
 
@@ -1462,7 +1513,7 @@ function initGame() {
     players, yama, dora: [dora], kanDora: [],
     round: 1, honba: 0, riichiPot: 0,
     currentTurn: 0, phase: 'draw',
-    tsumoTile: null, pendingAction: null,
+    tsumoTile: null, pendingAction: null, pendingRiichi: false,
     gameOver: false, turnCount: 0, playerCount
   };
 
@@ -1875,6 +1926,16 @@ function handleCpuWin(playerIdx, hand, type) {
 // ============================================================
 function discardTile(tile) {
   if (G.phase !== 'player_draw' && G.phase !== 'discard' && G.phase !== 'draw') return;
+  if (G.pendingRiichi) {
+    if (!G.tsumoTile || tile.id !== G.tsumoTile.id) {
+      showNotification('ツモ牌を捨ててリーチを確定してください'); return;
+    }
+    G.players[0].riichi = true;
+    G.players[0].score -= 1000;
+    G.riichiPot += 1000;
+    G.pendingRiichi = false;
+    addLog('リーチ！', 'riichi');
+  }
   if (G.players[0].riichi && G.tsumoTile && tile.id !== G.tsumoTile.id) {
     showNotification('リーチ中はツモ切りのみです'); return;
   }
@@ -1936,15 +1997,13 @@ function declareTsumo() {
 function declareRon() { showNotification('ロン（CPU捨て後に自動判定）'); }
 function declareRiichi() {
   const p = G.players[0];
-  const fullHand = getPlayerHand(0);
   if (p.score < 1000) { showNotification('点数が足りません'); return; }
-  const sh = calcShanten(fullHand);
-  if (sh > 0) { showNotification('テンパイしていません'); return; }
-  p.riichi = true; p.score -= 1000; G.riichiPot += 1000;
-  addLog('リーチ！', 'riichi');
-  showNotification('リーチ！');
+  if (!G.tsumoTile) { showNotification('ツモ牌がありません'); return; }
+  const sh13 = calcShanten([...p.hand]);
+  if (sh13 > 0) { showNotification('テンパイしていません'); return; }
+  G.pendingRiichi = true;
+  showNotification('ツモ牌を捨ててリーチ確定！');
   updateUI();
-  saveGameState();
 }
 
 function declareChi() { showNotification('チー（実装中）'); }
@@ -2019,7 +2078,7 @@ function renderPlayerHand() {
 
   let html = '';
   for (const t of hand) html += renderTile(t, 'lg', '');
-  if (tsumo) html += renderTile(tsumo, 'lg', 'tsumo');
+  if (tsumo) html += renderTile(tsumo, 'lg', G.pendingRiichi ? 'tsumo pending-riichi' : 'tsumo');
   document.getElementById('playerHand').innerHTML = html;
 
   document.getElementById('tenpaiIndicator').classList.toggle('hidden', sh > 0);
@@ -2066,29 +2125,124 @@ function renderScorePanel() {
 
 function renderActionButtons() {
   const isPlayerTurn = G.phase === 'player_draw';
-  const fullHand = getPlayerHand(0);
-  const sh = calcShanten(fullHand);
-  const agari = fullHand.length === 14 && checkAgari(fullHand);
   const p = G.players[0];
+  const agari = isPlayerTurn && getPlayerHand(0).length === 14 && checkAgari(getPlayerHand(0));
+  const sh13 = isPlayerTurn ? calcShanten([...p.hand]) : 99;
+  const showTsumo = isPlayerTurn && !!agari;
+  const showRiichi = isPlayerTurn && sh13 <= 0 && !p.riichi && !G.pendingRiichi && p.score >= 1000 && !!G.tsumoTile;
 
-  document.getElementById('btnTsumo').disabled = !isPlayerTurn || !agari;
-  document.getElementById('btnRiichi').disabled = !isPlayerTurn || sh > 0 || p.riichi || p.score < 1000;
-  document.getElementById('btnRon').disabled = true;
-  document.getElementById('btnChi').disabled = true;
-  document.getElementById('btnPon').disabled = true;
-  document.getElementById('btnKan').disabled = true;
-  document.getElementById('btnSkip').disabled = isPlayerTurn;
+  const show = (id, visible) => {
+    const el = document.getElementById(id);
+    el.style.display = visible ? '' : 'none';
+    el.disabled = !visible;
+  };
+  show('btnTsumo', showTsumo);
+  show('btnRiichi', showRiichi);
+  show('btnRon', false);
+  show('btnChi', false);
+  show('btnPon', false);
+  show('btnKan', false);
+  show('btnSkip', false);
+
+  const bar = document.getElementById('actionBar');
+  bar.style.display = (showTsumo || showRiichi) ? '' : 'none';
 
   document.getElementById('statusMsg').textContent =
     G.gameOver ? 'ゲーム終了' :
+    G.pendingRiichi ? 'ツモ牌を捨ててリーチ確定！' :
+    p.riichi ? 'リーチ中 — ツモ切りのみ' :
     isPlayerTurn ? (G.tsumoTile ? '捨てる牌を選んでください' : 'ツモ待ち...') :
     'CPUのターン...';
+
+  renderRiichiPanel();
+}
+
+function renderRiichiPanel() {
+  const panel = document.getElementById('riichiInfoPanel');
+  const p = G.players[0];
+  if (!p || !p.riichi) { panel.classList.add('hidden'); return; }
+  panel.classList.remove('hidden');
+
+  // Always show waiting tiles in the header
+  const hand13 = [...p.hand];
+  const waits = [];
+  for (const suit of ['man', 'pin', 'sou']) {
+    for (let n = 1; n <= 9; n++) {
+      if (checkAgari([...hand13, { suit, num: n, id: 9999 }])) waits.push({ suit, num: n });
+    }
+  }
+  for (let n = 1; n <= 7; n++) {
+    if (checkAgari([...hand13, { suit: 'jihai', num: n, id: 9999 }])) waits.push({ suit: 'jihai', num: n });
+  }
+  document.getElementById('riichiWaitsRow').innerHTML =
+    waits.map(w => { const wd = tileDisplay(w); return `<div class="tile tile-xs"><span class="${wd.color}">${wd.text}</span></div>`; }).join('');
+
+  // Render detail body if expanded
+  const detailBody = document.getElementById('riichiDetail');
+  if (detailBody.classList.contains('hidden')) return;
+
+  const baseCtx = getPlayerContext(0);
+  const waitDetails = waits.map(w => {
+    const completeHand = [...hand13, { ...w, id: 9999 }];
+    const ctx = { ...baseCtx, tsumo: true };
+    const yakuList = detectYaku(completeHand, p, ctx);
+    const fu = calcFu(completeHand, ctx);
+    const scoreInfo = calcScore(yakuList, fu, 0);
+    const totalHan = yakuList.reduce((s, y) => s + y.han, 0);
+    const pts = Math.ceil(scoreInfo.basicPoints * 4 / 100) * 100;
+    const hanLabel = scoreInfo.yakuman ? '役満' : totalHan >= 11 ? '三倍満' : totalHan >= 8 ? '倍満' : totalHan >= 6 ? '跳満' : totalHan >= 5 ? '満貫' : totalHan > 0 ? `${totalHan}翻${fu}符` : '';
+    const decomp = (() => {
+      const s14 = sortTiles(completeHand);
+      if (isChiitoitsu(s14)) {
+        const seen = {}; for (const t of s14) { const k = tileKey(t); if (!seen[k]) seen[k] = []; seen[k].push(t); }
+        return { type: 'chiitoitsu', pairs: Object.values(seen) };
+      }
+      if (isKokushi(s14)) return { type: 'kokushi' };
+      return tryDecomposeNormal(completeHand);
+    })();
+    return { display: tileDisplay(w), yakuList, totalHan, pts, hanLabel, decomp };
+  });
+
+  detailBody.innerHTML = `
+    <div class="detail-section">
+      <div class="detail-title">リーチ中の手牌</div>
+      <div class="hand-example">${sortTiles(hand13).map(t => { const d = tileDisplay(t); return `<div class="tile tile-sm"><span class="${d.color}">${d.text}</span></div>`; }).join('')}</div>
+    </div>
+    <div class="detail-section">
+      <div class="detail-title">待ち牌と上がり分析（ツモ）</div>
+      <div class="wait-analysis">${waitDetails.map(wd => `
+        <div class="wait-analysis-item">
+          <div class="wait-analysis-header">
+            <div class="tile tile-sm"><span class="${wd.display.color}">${wd.display.text}</span></div>
+            <div class="wait-analysis-score">
+              ${wd.yakuList.length > 0
+                ? `<span class="wait-han-label">${wd.hanLabel}</span><span class="wait-pts">+${wd.pts.toLocaleString()}点</span>`
+                : '<span class="wait-no-yaku">役なし</span>'}
+            </div>
+          </div>
+          ${wd.yakuList.length > 0 ? `<div class="wait-yaku-list">${wd.yakuList.map(y => `<span class="wait-yaku-tag">${y.name}（${y.han >= 13 ? '役満' : y.han + '翻'}）</span>`).join('')}</div>` : ''}
+          ${renderDecomposition(wd.decomp)}
+        </div>`).join('')}
+      </div>
+    </div>`;
+}
+
+function toggleRiichiDetail() {
+  const detail = document.getElementById('riichiDetail');
+  const toggle = document.getElementById('riichiDetailToggle');
+  const isNowHidden = detail.classList.toggle('hidden');
+  toggle.textContent = isNowHidden ? '詳細 ▼' : '閉じる ▲';
+  if (!isNowHidden) renderRiichiPanel();
 }
 
 function renderCandidates() {
   const list = document.getElementById('candidateList');
   if (G.phase !== 'player_draw' || G.gameOver) {
     list.innerHTML = '<div style="font-size:0.72rem;color:rgba(232,224,208,0.35);text-align:center;padding:8px;">プレイヤーのターン時に表示</div>';
+    return;
+  }
+  if (G.players[0].riichi || G.pendingRiichi) {
+    list.innerHTML = '<div style="font-size:0.72rem;color:rgba(200,168,75,0.5);text-align:center;padding:8px;">リーチ中 — 詳細パネルで待ち牌を確認</div>';
     return;
   }
   const candidates = analyzeCandidates(0);
