@@ -811,12 +811,6 @@ body.layout-mobile .action-btn {
 }
 @keyframes notifSlide{from{transform:translateX(-50%) translateY(-15px);opacity:0;}to{transform:translateX(-50%) translateY(0);opacity:1;}}
 
-/* Save/restore indicator */
-.save-indicator{
-  position:fixed; bottom:60px; right:14px; z-index:50;
-  font-size:0.68rem; color:rgba(200,168,75,0.4);
-  pointer-events:none; transition:opacity 0.5s;
-}
 
 .hidden{display:none!important;}
 
@@ -1059,8 +1053,6 @@ body.search-mode *::selection {
   </button>
 </div>
 
-<!-- Save indicator -->
-<div class="save-indicator" id="saveIndicator">💾 保存済み</div>
 
 <!-- Modal -->
 <div class="modal-overlay hidden" id="modalOverlay" onclick="closeModal(event)">
@@ -1283,11 +1275,10 @@ function searchTerm(query) {
     <div class="sp-web-section">
       <div class="sp-web-label">外部サイトで詳しく調べる</div>
       <div class="sp-web-btns">
-        <a class="sp-web-btn" href="https://www.google.com/search?q=${encodedGoogle}" target="_blank" onclick="saveGameState()">🔎 Google検索</a>
-        <a class="sp-web-btn" href="https://ja.wikipedia.org/wiki/Special:Search?search=${encodedWiki}" target="_blank" onclick="saveGameState()">📚 Wikipedia</a>
-        <a class="sp-web-btn" href="https://mahjong.guide/a-quick-guide-to-mahjong/" target="_blank" onclick="saveGameState()">🃏 麻雀ガイド</a>
+        <a class="sp-web-btn" href="https://www.google.com/search?q=${encodedGoogle}" target="_blank">🔎 Google検索</a>
+        <a class="sp-web-btn" href="https://ja.wikipedia.org/wiki/Special:Search?search=${encodedWiki}" target="_blank">📚 Wikipedia</a>
+        <a class="sp-web-btn" href="https://mahjong.guide/a-quick-guide-to-mahjong/" target="_blank">🃏 麻雀ガイド</a>
       </div>
-      <div style="font-size:0.68rem;color:rgba(232,224,208,0.4);margin-top:8px;">※ 外部ページに移動してもゲームの進行は自動保存されます</div>
     </div>
   `;
 
@@ -1406,41 +1397,6 @@ document.addEventListener('click', (e) => {
 });
 
 // ============================================================
-// GAME STATE SAVE / RESTORE
-// ============================================================
-function saveGameState() {
-  if (!G) return;
-  try {
-    const state = {
-      G: JSON.stringify(G),
-      gameType,
-      layout: currentLayout,
-      ts: Date.now()
-    };
-    localStorage.setItem('mahjong_save', JSON.stringify(state));
-    const ind = document.getElementById('saveIndicator');
-    ind.style.opacity = '1';
-    setTimeout(() => { ind.style.opacity = '0'; }, 2000);
-  } catch(e) {}
-}
-
-function loadGameState() {
-  try {
-    const raw = localStorage.getItem('mahjong_save');
-    if (!raw) return false;
-    const state = JSON.parse(raw);
-    // Only restore if saved within 24h
-    if (Date.now() - state.ts > 86400000) return false;
-    G = JSON.parse(state.G);
-    gameType = state.layout ? (state.gameType || 4) : 4;
-    return state.layout || 'desktop';
-  } catch(e) {
-    return false;
-  }
-}
-
-// Auto-save every 5 seconds during game
-setInterval(() => { if (G && !G.gameOver) saveGameState(); }, 5000);
 
 // ============================================================
 // TILE DEFINITIONS
@@ -1931,7 +1887,7 @@ function handleCpuWin(playerIdx, hand, type) {
   addLog(`${p.name}が${type==='tsumo'?'ツモ':'ロン'}! ${han}翻`, 'win');
   updateUI();
   showNotification(`${p.name}が${type==='tsumo'?'ツモ':'ロン'}アガリ！`);
-  saveGameState();
+
 }
 
 // ============================================================
@@ -1981,7 +1937,7 @@ function discardTile(tile) {
     handleCpuWin(1, cpu1Hand, 'tsumo'); return;
   }
   updateUI();
-  saveGameState();
+
   cpuTurn(1);
 }
 
@@ -2004,7 +1960,7 @@ function declareTsumo() {
     p.score += tsumoPts;
   }
   addLog(`ツモ! ${han}翻${fu}符`, 'win');
-  saveGameState();
+
 }
 
 function declareRon() { showNotification('ロン（CPU捨て後に自動判定）'); }
@@ -2029,7 +1985,7 @@ function handleRyuukyoku() {
   addLog('流局', 'system');
   showNotification('流局');
   updateUI();
-  saveGameState();
+
   setTimeout(() => {
     showModal('流局', `<div class="result-display">
       <div style="font-size:2rem;color:var(--gold);margin-bottom:14px;">流局</div>
@@ -2651,21 +2607,8 @@ window.addEventListener('load', () => {
     if (savedCpu) document.getElementById('cpuAlgo').value = savedCpu;
   } catch(e) {}
 
-  // Check if we can restore a game
-  const restoredLayout = loadGameState();
-
-  if (savedLayout || restoredLayout) {
-    const layout = restoredLayout || savedLayout;
-    // Show layout selector briefly then auto-select
-    if (restoredLayout) {
-      // Restore the saved game
-      selectLayout(layout);
-      updateUI();
-      showNotification('前回のゲームを復元しました');
-    } else {
-      // Just remember layout preference but still show selector
-      // (pre-highlight the saved choice)
-    }
+  if (savedLayout) {
+    // Just remember layout preference but still show selector
   }
 });
 </script>
