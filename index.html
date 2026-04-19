@@ -1485,6 +1485,7 @@ function initGame() {
     round: 1, honba: 0, riichiPot: 0,
     currentTurn: 0, phase: 'draw',
     tsumoTile: null, pendingAction: null, pendingRiichi: false,
+    lastDiscard: null, lastDiscardPlayer: -1,
     gameOver: false, turnCount: 0, playerCount
   };
 
@@ -1839,11 +1840,13 @@ function cpuTurn(playerIdx) {
     p.discards.push(discardTile);
     addLog(`${p.name}が ${renderTileText(discardTile)} を捨てた`, 'cpu');
 
+    G.lastDiscard = discardTile;
+    G.lastDiscardPlayer = playerIdx;
     G.currentTurn = (G.currentTurn + 1) % G.playerCount;
     if (G.currentTurn === 0) {
-      drawTile(0);
-      G.phase = 'player_draw';
+      G.phase = 'cpu_discard';
       updateUI();
+      checkPlayerReactions();
     } else {
       drawTile(G.currentTurn);
       const cpuHand = getPlayerHand(G.currentTurn);
@@ -1897,20 +1900,21 @@ function handleCpuWin(playerIdx, hand, type) {
 // ============================================================
 function discardTile(tile) {
   if (G.phase !== 'player_draw' && G.phase !== 'discard' && G.phase !== 'draw') return;
+  const p = G.players[0];
   if (G.pendingRiichi) {
-    if (!G.tsumoTile || tile.id !== G.tsumoTile.id) {
-      showNotification('ツモ牌を捨ててリーチを確定してください'); return;
+    const remaining = (G.tsumoTile ? [...p.hand, G.tsumoTile] : [...p.hand]).filter(t => t.id !== tile.id);
+    if (calcShanten(remaining) !== -1) {
+      showNotification('テンパイを崩す牌は捨てられません！テンパイを維持できる牌を選んでください'); return;
     }
-    G.players[0].riichi = true;
-    G.players[0].score -= 1000;
+    p.riichi = true;
+    p.score -= 1000;
     G.riichiPot += 1000;
     G.pendingRiichi = false;
     addLog('リーチ！', 'riichi');
   }
-  if (G.players[0].riichi && G.tsumoTile && tile.id !== G.tsumoTile.id) {
+  if (p.riichi && G.tsumoTile && tile.id !== G.tsumoTile.id) {
     showNotification('リーチ中はツモ切りのみです'); return;
   }
-  const p = G.players[0];
   const fullHand = G.tsumoTile ? [...p.hand, G.tsumoTile] : [...p.hand];
   if (!fullHand.find(t => t.id === tile.id)) return;
 
@@ -1965,22 +1969,128 @@ function declareTsumo() {
 
 }
 
-function declareRon() { showNotification('ロン（CPU捨て後に自動判定）'); }
+function declareRon() {
+  if (G.phase !== 'cpu_discard') return;
+  const p = G.players[0];
+  const tile = G.lastDiscard;
+  const fullHand = [...p.hand, tile];
+  if (!checkAgari(fullHand)) { showNotification('アガリではありません'); return; }
+  const context = getPlayerContext(0);
+  const yaku = detectYaku(fullHand, p, context);
+  if (yaku.length === 0) { showNotification('役がありません'); return; }
+  const han = yaku.reduce((s, y) => s + y.han, 0);
+  const fu = calcFu(fullHand, context);
+  showResultModal(fullHand, yaku, han, fu, 'ロン', tile);
+  G.gameOver = true;
+  const { basicPoints } = calcScore(yaku, fu, han);
+  const pts = Math.ceil(basicPoints * 4 / 100) * 100;
+  p.score += pts + G.riichiPot;
+  G.players[G.lastDiscardPlayer].score -= pts;
+  G.riichiPot = 0;
+  addLog(`ロン！ ${han}翻${fu}符`, 'win');
+  updateUI();
+}
+
 function declareRiichi() {
   const p = G.players[0];
   if (p.score < 1000) { showNotification('点数が足りません'); return; }
   if (!G.tsumoTile) { showNotification('ツモ牌がありません'); return; }
-  const sh13 = calcShanten([...p.hand]);
-  if (sh13 !== -1) { showNotification('テンパイしていません'); return; }
+  if (!canDeclareRiichi(p)) { showNotification('テンパイになる捨て牌がありません'); return; }
   G.pendingRiichi = true;
-  showNotification('ツモ牌を捨ててリーチ確定！');
+  showNotification('テンパイを維持できる牌を捨ててリーチ確定！');
   updateUI();
 }
 
-function declareChi() { showNotification('チー（実装中）'); }
-function declarePon() { showNotification('ポン（実装中）'); }
-function declareKan() { showNotification('カン（実装中）'); }
-function skipAction() { updateUI(); }
+function checkPlayerReactions() {
+  if (G.gameOver) return;
+  const p = G.players[0];
+  const tile = G.lastDiscard;
+  if (!tile) { drawTile(0); G.phase = 'player_draw'; updateUI(); return; }
+  const sameInHand = p.hand.filter(t => t.suit === tile.suit && t.num === tile.num).length;
+  const fullHand = [...p.hand, tile];
+  const canRon = !p.riichi && checkAgari(fullHand) && detectYaku(fullHand, p, getPlayerContext(0)).length > 0;
+  const canPon = !p.riichi && sameInHand >= 2;
+  const canKan = !p.riichi && sameInHand >= 3;
+  if (canRon || canPon || canKan) {
+    updateUI();
+  } else {
+    drawTile(0);
+    G.phase = 'player_draw';
+    updateUI();
+  }
+}
+
+function canDeclareRiichi(p) {
+  const fullHand = G.tsumoTile ? [...p.hand, G.tsumoTile] : [...p.hand];
+  if (fullHand.length !== 14) return false;
+  for (let i = 0; i < fullHand.length; i++) {
+    const remaining = fullHand.filter((_, j) => j !== i);
+    if (calcShanten(remaining) === -1) return true;
+  }
+  return false;
+}
+
+function declareChi() { showNotification('チーはこのゲームでは使えません'); }
+
+function declarePon() {
+  if (G.phase !== 'cpu_discard') return;
+  const p = G.players[0];
+  const tile = G.lastDiscard;
+  const matches = p.hand.filter(t => t.suit === tile.suit && t.num === tile.num);
+  if (matches.length < 2) return;
+  for (let i = 0; i < 2; i++) {
+    const idx = p.hand.findIndex(t => t.suit === tile.suit && t.num === tile.num);
+    p.hand.splice(idx, 1);
+  }
+  p.melds.push({ type: 'pon', tiles: [tile, matches[0], matches[1]], from: G.lastDiscardPlayer });
+  addLog(`ポン！ ${renderTileText(tile)}`, 'player');
+  G.tsumoTile = null;
+  G.phase = 'player_draw';
+  updateUI();
+}
+
+function declareKan() {
+  if (G.phase === 'cpu_discard') {
+    const p = G.players[0];
+    const tile = G.lastDiscard;
+    const matches = p.hand.filter(t => t.suit === tile.suit && t.num === tile.num);
+    if (matches.length < 3) return;
+    for (let i = 0; i < 3; i++) {
+      const idx = p.hand.findIndex(t => t.suit === tile.suit && t.num === tile.num);
+      p.hand.splice(idx, 1);
+    }
+    p.melds.push({ type: 'minkan', tiles: [tile, ...matches], from: G.lastDiscardPlayer });
+    addLog(`カン！ ${renderTileText(tile)}`, 'player');
+    if (G.yama.length === 0) { handleRyuukyoku(); return; }
+    G.tsumoTile = G.yama.pop();
+    G.phase = 'player_draw';
+    updateUI();
+  } else if (G.phase === 'player_draw') {
+    const p = G.players[0];
+    const fullHand = G.tsumoTile ? [...p.hand, G.tsumoTile] : [...p.hand];
+    const counts = {};
+    for (const t of fullHand) { const k = tileKey(t); if (!counts[k]) counts[k] = []; counts[k].push(t); }
+    const kanSet = Object.values(counts).find(arr => arr.length >= 4);
+    if (!kanSet) { showNotification('暗カンできる牌がありません'); return; }
+    for (const t of kanSet) {
+      if (G.tsumoTile && t.id === G.tsumoTile.id) { G.tsumoTile = null; }
+      else { const idx = p.hand.findIndex(h => h.id === t.id); if (idx >= 0) p.hand.splice(idx, 1); }
+    }
+    p.melds.push({ type: 'ankan', tiles: kanSet, from: -1 });
+    addLog(`暗カン！ ${renderTileText(kanSet[0])}`, 'player');
+    if (G.yama.length === 0) { handleRyuukyoku(); return; }
+    G.tsumoTile = G.yama.pop();
+    updateUI();
+  }
+}
+
+function skipAction() {
+  if (G.phase === 'cpu_discard') {
+    drawTile(0);
+    G.phase = 'player_draw';
+    updateUI();
+  }
+}
 
 function handleRyuukyoku() {
   G.gameOver = true;
@@ -2092,11 +2202,29 @@ function renderScorePanel() {
 
 function renderActionButtons() {
   const isPlayerTurn = G.phase === 'player_draw';
+  const isCpuDiscard = G.phase === 'cpu_discard';
   const p = G.players[0];
+
   const agari = isPlayerTurn && getPlayerHand(0).length === 14 && checkAgari(getPlayerHand(0));
-  const sh13 = isPlayerTurn ? calcShanten([...p.hand]) : 99;
   const showTsumo = isPlayerTurn && !!agari;
-  const showRiichi = isPlayerTurn && sh13 === -1 && !p.riichi && !G.pendingRiichi && p.score >= 1000 && !!G.tsumoTile;
+  const showRiichi = isPlayerTurn && !p.riichi && !G.pendingRiichi && p.score >= 1000 && !!G.tsumoTile && canDeclareRiichi(p);
+
+  // Ankan check
+  const fullHand14 = isPlayerTurn && G.tsumoTile ? [...p.hand, G.tsumoTile] : [];
+  const handCounts = {};
+  for (const t of fullHand14) { const k = tileKey(t); handCounts[k] = (handCounts[k] || 0) + 1; }
+  const showAnkan = isPlayerTurn && !!G.tsumoTile && !p.riichi && Object.values(handCounts).some(c => c >= 4);
+
+  // cpu_discard reaction checks
+  let showRon = false, showPon = false, showMinkan = false;
+  if (isCpuDiscard && G.lastDiscard) {
+    const tile = G.lastDiscard;
+    const sameInHand = p.hand.filter(t => t.suit === tile.suit && t.num === tile.num).length;
+    const fullHandRon = [...p.hand, tile];
+    showRon = !p.riichi && checkAgari(fullHandRon) && detectYaku(fullHandRon, p, getPlayerContext(0)).length > 0;
+    showPon = !p.riichi && sameInHand >= 2;
+    showMinkan = !p.riichi && sameInHand >= 3;
+  }
 
   const show = (id, visible) => {
     const el = document.getElementById(id);
@@ -2105,19 +2233,20 @@ function renderActionButtons() {
   };
   show('btnTsumo', showTsumo);
   show('btnRiichi', showRiichi);
-  show('btnRon', false);
+  show('btnRon', showRon);
   show('btnChi', false);
-  show('btnPon', false);
-  show('btnKan', false);
-  show('btnSkip', false);
+  show('btnPon', showPon);
+  show('btnKan', showAnkan || showMinkan);
+  show('btnSkip', isCpuDiscard);
 
-  const bar = document.getElementById('actionBar');
-  bar.style.display = (showTsumo || showRiichi) ? '' : 'none';
+  const anyVisible = showTsumo || showRiichi || showRon || showPon || showAnkan || showMinkan || isCpuDiscard;
+  document.getElementById('actionBar').style.display = anyVisible ? '' : 'none';
 
   document.getElementById('statusMsg').textContent =
     G.gameOver ? 'ゲーム終了' :
-    G.pendingRiichi ? 'ツモ牌を捨ててリーチ確定！' :
+    G.pendingRiichi ? 'テンパイを維持できる牌を捨ててリーチ確定！' :
     p.riichi ? 'リーチ中 — ツモ切りのみ' :
+    isCpuDiscard ? `${G.players[G.lastDiscardPlayer]?.name}が捨てました — 反応しますか？` :
     isPlayerTurn ? (G.tsumoTile ? '捨てる牌を選んでください' : 'ツモ待ち...') :
     'CPUのターン...';
 
