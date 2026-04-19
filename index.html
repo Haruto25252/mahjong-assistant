@@ -411,8 +411,8 @@ body.layout-mobile .mobile-tab-bar { display:flex; }
 
 .cpu-tile-back {
   width:16px; height:22px;
-  background:linear-gradient(135deg,#2a5a9a,#1a3a6e);
-  border-radius:2px; border:1px solid rgba(255,255,255,0.2);
+  background:url('tiles/Regular/Back.png') center/cover no-repeat;
+  border-radius:2px;
 }
 
 /* mobile: smaller CPU tiles */
@@ -451,12 +451,16 @@ body.layout-mobile .cpu-tile-back { width:12px; height:17px; }
 /* ===== TILES ===== */
 .tile {
   display:inline-flex; align-items:center; justify-content:center;
-  background:linear-gradient(145deg,#faf6ee,#ece4d4);
-  border:1px solid #c8b89a; border-radius:3px;
-  box-shadow:2px 2px 0px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.8);
+  background: url('tiles/Regular/Front.png') center/100% 100% no-repeat;
+  border-radius:3px;
+  box-shadow:2px 2px 0px rgba(0,0,0,0.3);
   cursor:pointer; transition:transform 0.15s, box-shadow 0.15s;
   position:relative; user-select:none;
-  font-family:'Zen Antique',serif;
+  overflow:hidden; padding:0;
+}
+
+.tile-img {
+  width:100%; height:100%; object-fit:fill; display:block;
 }
 
 .tile:hover { transform:translateY(-4px); }
@@ -464,14 +468,14 @@ body.layout-mobile .cpu-tile-back { width:12px; height:17px; }
 .tile.tsumo { border-color:#5dade2; margin-left:8px; box-shadow:2px 2px 0 rgba(0,0,0,0.3), 0 0 8px rgba(93,173,226,0.5); }
 .tile.candidate-best { border-color:#2ecc71; box-shadow:2px 2px 0 rgba(0,0,0,0.3), 0 0 10px rgba(46,204,113,0.7); }
 
-.tile-lg { width:42px; height:58px; font-size:1.5rem; }
-.tile-md { width:32px; height:44px; font-size:1.1rem; }
-.tile-sm { width:22px; height:30px; font-size:0.75rem; }
-.tile-xs { width:16px; height:22px; font-size:0.6rem; }
+.tile-lg { width:42px; height:58px; }
+.tile-md { width:32px; height:44px; }
+.tile-sm { width:22px; height:30px; }
+.tile-xs { width:16px; height:22px; }
 
 /* Mobile tile sizes */
-body.layout-mobile .tile-lg { width:34px; height:48px; font-size:1.2rem; }
-body.layout-mobile .tile-md { width:26px; height:36px; font-size:0.9rem; }
+body.layout-mobile .tile-lg { width:34px; height:48px; }
+body.layout-mobile .tile-md { width:26px; height:36px; }
 
 .man{color:#c0392b;} .pin{color:#1a5276;} .sou{color:#1e8449;}
 .jihai{color:#2c3e50;} .haku{color:#2c3e50;font-weight:900;}
@@ -807,12 +811,6 @@ body.layout-mobile .action-btn {
 }
 @keyframes notifSlide{from{transform:translateX(-50%) translateY(-15px);opacity:0;}to{transform:translateX(-50%) translateY(0);opacity:1;}}
 
-/* Save/restore indicator */
-.save-indicator{
-  position:fixed; bottom:60px; right:14px; z-index:50;
-  font-size:0.68rem; color:rgba(200,168,75,0.4);
-  pointer-events:none; transition:opacity 0.5s;
-}
 
 .hidden{display:none!important;}
 
@@ -1055,8 +1053,6 @@ body.search-mode *::selection {
   </button>
 </div>
 
-<!-- Save indicator -->
-<div class="save-indicator" id="saveIndicator">💾 保存済み</div>
 
 <!-- Modal -->
 <div class="modal-overlay hidden" id="modalOverlay" onclick="closeModal(event)">
@@ -1279,11 +1275,10 @@ function searchTerm(query) {
     <div class="sp-web-section">
       <div class="sp-web-label">外部サイトで詳しく調べる</div>
       <div class="sp-web-btns">
-        <a class="sp-web-btn" href="https://www.google.com/search?q=${encodedGoogle}" target="_blank" onclick="saveGameState()">🔎 Google検索</a>
-        <a class="sp-web-btn" href="https://ja.wikipedia.org/wiki/Special:Search?search=${encodedWiki}" target="_blank" onclick="saveGameState()">📚 Wikipedia</a>
-        <a class="sp-web-btn" href="https://mahjong.guide/a-quick-guide-to-mahjong/" target="_blank" onclick="saveGameState()">🃏 麻雀ガイド</a>
+        <a class="sp-web-btn" href="https://www.google.com/search?q=${encodedGoogle}" target="_blank">🔎 Google検索</a>
+        <a class="sp-web-btn" href="https://ja.wikipedia.org/wiki/Special:Search?search=${encodedWiki}" target="_blank">📚 Wikipedia</a>
+        <a class="sp-web-btn" href="https://mahjong.guide/a-quick-guide-to-mahjong/" target="_blank">🃏 麻雀ガイド</a>
       </div>
-      <div style="font-size:0.68rem;color:rgba(232,224,208,0.4);margin-top:8px;">※ 外部ページに移動してもゲームの進行は自動保存されます</div>
     </div>
   `;
 
@@ -1402,41 +1397,6 @@ document.addEventListener('click', (e) => {
 });
 
 // ============================================================
-// GAME STATE SAVE / RESTORE
-// ============================================================
-function saveGameState() {
-  if (!G) return;
-  try {
-    const state = {
-      G: JSON.stringify(G),
-      gameType,
-      layout: currentLayout,
-      ts: Date.now()
-    };
-    localStorage.setItem('mahjong_save', JSON.stringify(state));
-    const ind = document.getElementById('saveIndicator');
-    ind.style.opacity = '1';
-    setTimeout(() => { ind.style.opacity = '0'; }, 2000);
-  } catch(e) {}
-}
-
-function loadGameState() {
-  try {
-    const raw = localStorage.getItem('mahjong_save');
-    if (!raw) return false;
-    const state = JSON.parse(raw);
-    // Only restore if saved within 24h
-    if (Date.now() - state.ts > 86400000) return false;
-    G = JSON.parse(state.G);
-    gameType = state.layout ? (state.gameType || 4) : 4;
-    return state.layout || 'desktop';
-  } catch(e) {
-    return false;
-  }
-}
-
-// Auto-save every 5 seconds during game
-setInterval(() => { if (G && !G.gameOver) saveGameState(); }, 5000);
 
 // ============================================================
 // TILE DEFINITIONS
@@ -1459,6 +1419,15 @@ function createTile(suit, num, id) { return { suit, num, id }; }
 function tileDisplay(tile) {
   if (tile.suit === 'jihai') return TILE_DISPLAY.jihai(tile.num);
   return TILE_DISPLAY[tile.suit](tile.num);
+}
+
+function getTileImagePath(tile, folder='Regular') {
+  if (tile.suit === 'jihai') {
+    const names = ['Ton','Nan','Shaa','Pei','Haku','Hatsu','Chun'];
+    return `tiles/${folder}/${names[tile.num-1]}.png`;
+  }
+  const suit = tile.suit.charAt(0).toUpperCase() + tile.suit.slice(1);
+  return `tiles/${folder}/${suit}${tile.num}.png`;
 }
 
 function tileKey(t) { return t.suit + t.num; }
@@ -1918,7 +1887,7 @@ function handleCpuWin(playerIdx, hand, type) {
   addLog(`${p.name}が${type==='tsumo'?'ツモ':'ロン'}! ${han}翻`, 'win');
   updateUI();
   showNotification(`${p.name}が${type==='tsumo'?'ツモ':'ロン'}アガリ！`);
-  saveGameState();
+
 }
 
 // ============================================================
@@ -1968,7 +1937,7 @@ function discardTile(tile) {
     handleCpuWin(1, cpu1Hand, 'tsumo'); return;
   }
   updateUI();
-  saveGameState();
+
   cpuTurn(1);
 }
 
@@ -1991,7 +1960,7 @@ function declareTsumo() {
     p.score += tsumoPts;
   }
   addLog(`ツモ! ${han}翻${fu}符`, 'win');
-  saveGameState();
+
 }
 
 function declareRon() { showNotification('ロン（CPU捨て後に自動判定）'); }
@@ -2016,7 +1985,7 @@ function handleRyuukyoku() {
   addLog('流局', 'system');
   showNotification('流局');
   updateUI();
-  saveGameState();
+
   setTimeout(() => {
     showModal('流局', `<div class="result-display">
       <div style="font-size:2rem;color:var(--gold);margin-bottom:14px;">流局</div>
@@ -2033,15 +2002,17 @@ function handleRyuukyoku() {
 // UI RENDERING
 // ============================================================
 function renderTile(tile, size='lg', extra='') {
-  const d = tileDisplay(tile);
+  const src = getTileImagePath(tile);
+  const alt = tileDisplay(tile).text;
   return `<div class="tile tile-${size} ${extra}" onclick="discardTile(getTileById(${tile.id}))" data-id="${tile.id}">
-    <span class="${d.color}">${d.text}</span>
+    <img src="${src}" alt="${alt}" class="tile-img">
   </div>`;
 }
 
 function renderSmallTile(tile, size='sm') {
-  const d = tileDisplay(tile);
-  return `<div class="tile tile-${size}"><span class="${d.color}">${d.text}</span></div>`;
+  const src = getTileImagePath(tile);
+  const alt = tileDisplay(tile).text;
+  return `<div class="tile tile-${size}"><img src="${src}" alt="${alt}" class="tile-img"></div>`;
 }
 
 function renderTileText(tile) { return tileDisplay(tile).text; }
@@ -2250,7 +2221,7 @@ function renderCandidates() {
     const d = c.display;
     return `<div class="candidate-item ${isBest?'best':''}" onclick="highlightCandidate(${c.tile.id})">
       <div class="candidate-rank ${isBest?'best':''}">${isBest?'★':i+1}</div>
-      <div><div class="tile tile-sm"><span class="${d.color}">${d.text}</span></div></div>
+      <div><div class="tile tile-sm"><img src="${getTileImagePath(c.tile)}" alt="${d.text}" class="tile-img"></div></div>
       <div class="candidate-info">
         <div class="candidate-shanten">${shantenText}</div>
         <div class="candidate-yaku">${c.yaku.map(y=>y.name).join('・')||'役なし'}</div>
@@ -2288,7 +2259,7 @@ function showResultModal(hand, yaku, han, fu, type, loser) {
   let hanLabel = yakuman||totalHan>=13 ? '役満' : totalHan>=11?'三倍満':totalHan>=8?'倍満':totalHan>=6?'跳満':totalHan>=5?'満貫':`${totalHan}翻${fu}符`;
   showModal(type, `<div class="result-display">
     <div class="result-type">${type}</div>
-    <div class="result-hand-display">${sortTiles(hand).map(t=>{const d=tileDisplay(t);return`<div class="tile tile-md"><span class="${d.color}">${d.text}</span></div>`;}).join('')}</div>
+    <div class="result-hand-display">${sortTiles(hand).map(t=>`<div class="tile tile-md"><img src="${getTileImagePath(t)}" alt="${tileDisplay(t).text}" class="tile-img"></div>`).join('')}</div>
     <div class="result-yaku-list">${yaku.map(y=>`<div class="result-yaku-item"><span>${y.name}</span><span style="color:var(--gold)">${y.han>=13?'役満':y.han+'翻'}</span></div>`).join('')}</div>
     <div class="result-fu">${hanLabel}</div>
     <div class="result-total">+${pts.toLocaleString()}点</div>
@@ -2418,7 +2389,7 @@ function tryDecomposeNormal(tiles) {
 
 function renderDecomposition(decomp) {
   if (!decomp) return '';
-  const tileXS = t => { const d = tileDisplay(t); return `<div class="tile tile-xs"><span class="${d.color}">${d.text}</span></div>`; };
+  const tileXS = t => `<div class="tile tile-xs"><img src="${getTileImagePath(t)}" alt="${tileDisplay(t).text}" class="tile-img"></div>`;
   if (decomp.type === 'kokushi') return '<div style="font-size:0.7rem;color:rgba(232,224,208,0.5)">国士無双</div>';
   if (decomp.type === 'chiitoitsu') {
     return `<div class="decomp-display">${decomp.pairs.map(pair =>
@@ -2447,7 +2418,7 @@ function showCandidateDetail(tileId, event) {
 
   const handHTML = `<div class="detail-section">
     <div class="detail-title">捨てた後の手牌</div>
-    <div class="hand-example">${sortTiles(remaining).map(t => { const rd = tileDisplay(t); return `<div class="tile tile-sm"><span class="${rd.color}">${rd.text}</span></div>`; }).join('')}</div>
+    <div class="hand-example">${sortTiles(remaining).map(t => `<div class="tile tile-sm"><img src="${getTileImagePath(t)}" alt="${tileDisplay(t).text}" class="tile-img"></div>`).join('')}</div>
   </div>`;
 
   const shantenHTML = `<div class="detail-section">
@@ -2489,7 +2460,7 @@ function showCandidateDetail(tileId, event) {
           return { type: 'chiitoitsu', pairs: Object.values(seen) };
         })() : isKokushi(sorted14) ? { type: 'kokushi' } : tryDecomposeNormal(completeHand);
         const wd = tileDisplay(w);
-        return { display: wd, yakuList, fu, totalHan, pts, hanLabel, decomp };
+        return { tile: w, display: wd, yakuList, fu, totalHan, pts, hanLabel, decomp };
       });
 
       tenpaiHTML = `<div class="detail-section">
@@ -2497,7 +2468,7 @@ function showCandidateDetail(tileId, event) {
         <div class="wait-analysis">${waitDetails.map(wd => `
           <div class="wait-analysis-item">
             <div class="wait-analysis-header">
-              <div class="tile tile-sm"><span class="${wd.display.color}">${wd.display.text}</span></div>
+              <div class="tile tile-sm"><img src="${getTileImagePath(wd.tile)}" alt="${wd.display.text}" class="tile-img"></div>
               <div class="wait-analysis-score">
                 ${wd.yakuList.length > 0
                   ? `<span class="wait-han-label">${wd.hanLabel}</span><span class="wait-pts">+${wd.pts.toLocaleString()}点</span>`
@@ -2636,21 +2607,8 @@ window.addEventListener('load', () => {
     if (savedCpu) document.getElementById('cpuAlgo').value = savedCpu;
   } catch(e) {}
 
-  // Check if we can restore a game
-  const restoredLayout = loadGameState();
-
-  if (savedLayout || restoredLayout) {
-    const layout = restoredLayout || savedLayout;
-    // Show layout selector briefly then auto-select
-    if (restoredLayout) {
-      // Restore the saved game
-      selectLayout(layout);
-      updateUI();
-      showNotification('前回のゲームを復元しました');
-    } else {
-      // Just remember layout preference but still show selector
-      // (pre-highlight the saved choice)
-    }
+  if (savedLayout) {
+    // Just remember layout preference but still show selector
   }
 });
 </script>
@@ -2665,7 +2623,7 @@ window.addEventListener('load', () => {
   display:flex; flex-direction:column; align-items:center; gap:6px;
 ">
   <div style="font-size:0.72rem; color:rgba(200,168,75,0.5); letter-spacing:0.05em;">
-    © 2025 <a href="https://github.com/Haruto25252" target="_blank"
+    © 2026 <a href="https://github.com/Haruto25252" target="_blank"
       style="color:rgba(200,168,75,0.7); text-decoration:none; transition:color 0.2s;"
       onmouseover="this.style.color='#c8a84b'" onmouseout="this.style.color='rgba(200,168,75,0.7)'">
       Haruto25252
