@@ -585,6 +585,10 @@ body.layout-mobile .action-btn {
   box-shadow:2px 2px 0 rgba(0,0,0,0.3), 0 0 14px rgba(200,168,75,0.9) !important;
   animation:pulse-gold-tile 0.8s infinite;
 }
+.tile.riichi-blocked {
+  opacity:0.3; cursor:not-allowed; filter:grayscale(0.6);
+}
+.tile.riichi-blocked:hover { transform:none !important; }
 @keyframes pulse-gold-tile {
   0%,100%{box-shadow:2px 2px 0 rgba(0,0,0,0.3),0 0 8px rgba(200,168,75,0.6);}
   50%{box-shadow:2px 2px 0 rgba(0,0,0,0.3),0 0 20px rgba(200,168,75,1);}
@@ -2093,18 +2097,37 @@ function declareKan() {
     const fullHand = G.tsumoTile ? [...p.hand, G.tsumoTile] : [...p.hand];
     const counts = {};
     for (const t of fullHand) { const k = tileKey(t); if (!counts[k]) counts[k] = []; counts[k].push(t); }
-    const kanSet = Object.values(counts).find(arr => arr.length >= 4);
-    if (!kanSet) { showNotification('暗カンできる牌がありません'); return; }
-    for (const t of kanSet) {
-      if (G.tsumoTile && t.id === G.tsumoTile.id) { G.tsumoTile = null; }
-      else { const idx = p.hand.findIndex(h => h.id === t.id); if (idx >= 0) p.hand.splice(idx, 1); }
-    }
-    p.melds.push({ type: 'ankan', tiles: kanSet, from: -1 });
-    addLog(`暗カン！ ${renderTileText(kanSet[0])}`, 'player');
-    if (G.yama.length === 0) { handleRyuukyoku(); return; }
-    G.tsumoTile = G.yama.pop();
-    updateUI();
+    const kanSets = Object.values(counts).filter(arr => arr.length >= 4);
+    if (kanSets.length === 0) { showNotification('暗カンできる牌がありません'); return; }
+    if (kanSets.length === 1) { executeAnkan(kanSets[0]); return; }
+    // Multiple possible ankans — show selection modal
+    const tilesHtml = kanSets.map(set => {
+      const d = tileDisplay(set[0]);
+      return `<div class="tile tile-md" style="cursor:pointer" onclick="closeModal();executeAnkan(null,'${set[0].suit}',${set[0].num})"><span class="${d.color}">${d.text}</span></div>`;
+    }).join('');
+    showModal('暗カンする牌を選んでください', `<div style="display:flex;gap:12px;justify-content:center;padding:20px 0">${tilesHtml}</div>`);
+    return;
   }
+}
+
+function executeAnkan(kanSet, suit, num) {
+  const p = G.players[0];
+  if (!kanSet) {
+    const fullHand = G.tsumoTile ? [...p.hand, G.tsumoTile] : [...p.hand];
+    const counts = {};
+    for (const t of fullHand) { const k = tileKey(t); if (!counts[k]) counts[k] = []; counts[k].push(t); }
+    kanSet = Object.values(counts).find(arr => arr[0].suit === suit && arr[0].num === num && arr.length >= 4);
+  }
+  if (!kanSet) return;
+  for (const t of kanSet) {
+    if (G.tsumoTile && t.id === G.tsumoTile.id) { G.tsumoTile = null; }
+    else { const idx = p.hand.findIndex(h => h.id === t.id); if (idx >= 0) p.hand.splice(idx, 1); }
+  }
+  p.melds.push({ type: 'ankan', tiles: kanSet, from: -1 });
+  addLog(`暗カン！ ${renderTileText(kanSet[0])}`, 'player');
+  if (G.yama.length === 0) { handleRyuukyoku(); return; }
+  G.tsumoTile = G.yama.pop();
+  updateUI();
 }
 
 function skipAction() {
@@ -2155,6 +2178,7 @@ function getTileById(id) {
   return allTiles.find(t => t.id === numId) || null;
 }
 window.getTileById = getTileById;
+window.executeAnkan = executeAnkan;
 
 function updateUI() {
   if (!G) return;
@@ -2189,8 +2213,25 @@ function renderPlayerHand() {
   const sh = calcShanten([...p.hand, ...meldTiles]);
 
   let html = '';
-  for (const t of hand) html += renderTile(t, 'lg', '');
-  if (G.tsumoTile) html += renderTile(G.tsumoTile, 'lg', G.pendingRiichi ? 'tsumo pending-riichi' : 'tsumo');
+  const allTilesForRiichi = G.pendingRiichi
+    ? [...p.hand, ...meldTiles, ...(G.tsumoTile ? [G.tsumoTile] : [])]
+    : [];
+  for (const t of hand) {
+    let extra = '';
+    if (G.pendingRiichi) {
+      const remaining = allTilesForRiichi.filter(x => x.id !== t.id);
+      extra = calcShanten(remaining) !== -1 ? 'riichi-blocked' : '';
+    }
+    html += renderTile(t, 'lg', extra);
+  }
+  if (G.tsumoTile) {
+    let extra = 'tsumo';
+    if (G.pendingRiichi) {
+      const remaining = allTilesForRiichi.filter(x => x.id !== G.tsumoTile.id);
+      extra = calcShanten(remaining) !== -1 ? 'tsumo riichi-blocked' : 'tsumo pending-riichi';
+    }
+    html += renderTile(G.tsumoTile, 'lg', extra);
+  }
   document.getElementById('playerHand').innerHTML = html;
 
   document.getElementById('tenpaiIndicator').classList.toggle('hidden', sh !== -1);
