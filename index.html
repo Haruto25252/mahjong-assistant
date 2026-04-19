@@ -1922,6 +1922,7 @@ function handleCpuWin(playerIdx, hand, type) {
 function discardTile(tile) {
   if (G.phase !== 'player_draw' && G.phase !== 'discard' && G.phase !== 'draw') return;
   const p = G.players[0];
+  const wasDeclaringRiichi = G.pendingRiichi;
   if (G.pendingRiichi) {
     const remaining = [...p.hand, ...getMeldTiles(0), ...(G.tsumoTile ? [G.tsumoTile] : [])].filter(t => t.id !== tile.id);
     if (calcShanten(remaining) !== -1) {
@@ -1933,7 +1934,7 @@ function discardTile(tile) {
     G.pendingRiichi = false;
     addLog('リーチ！', 'riichi');
   }
-  if (p.riichi && G.tsumoTile && tile.id !== G.tsumoTile.id) {
+  if (!wasDeclaringRiichi && p.riichi && G.tsumoTile && tile.id !== G.tsumoTile.id) {
     showNotification('リーチ中はツモ切りのみです'); return;
   }
   const fullHand = G.tsumoTile ? [...p.hand, G.tsumoTile] : [...p.hand];
