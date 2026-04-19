@@ -1995,7 +1995,7 @@ function declareRon() {
   if (G.phase !== 'cpu_discard') return;
   const p = G.players[0];
   const tile = G.lastDiscard;
-  const fullHand = [...p.hand, tile];
+  const fullHand = [...p.hand, ...getMeldTiles(0), tile];
   if (!checkAgari(fullHand)) { showNotification('アガリではありません'); return; }
   const context = getPlayerContext(0);
   const yaku = detectYaku(fullHand, p, context);
@@ -2029,7 +2029,7 @@ function checkPlayerReactions() {
   const tile = G.lastDiscard;
   if (!tile) { drawTile(0); G.phase = 'player_draw'; updateUI(); return; }
   const sameInHand = p.hand.filter(t => t.suit === tile.suit && t.num === tile.num).length;
-  const fullHand = [...p.hand, tile];
+  const fullHand = [...p.hand, ...getMeldTiles(0), tile];
   const canRon = !p.riichi && checkAgari(fullHand) && detectYaku(fullHand, p, getPlayerContext(0)).length > 0;
   const canPon = !p.riichi && sameInHand >= 2;
   const canKan = !p.riichi && sameInHand >= 3;
@@ -2241,7 +2241,7 @@ function renderActionButtons() {
   const isCpuDiscard = G.phase === 'cpu_discard';
   const p = G.players[0];
 
-  const agari = isPlayerTurn && getPlayerHand(0).length === 14 && checkAgari(getPlayerHand(0));
+  const agari = isPlayerTurn && !!G.tsumoTile && getPlayerHand(0).length === 14 && checkAgari(getPlayerHand(0));
   const showTsumo = isPlayerTurn && !!agari;
   const showRiichi = isPlayerTurn && !p.riichi && !G.pendingRiichi && p.score >= 1000 && !!G.tsumoTile && canDeclareRiichi(p);
 
@@ -2256,7 +2256,7 @@ function renderActionButtons() {
   if (isCpuDiscard && G.lastDiscard) {
     const tile = G.lastDiscard;
     const sameInHand = p.hand.filter(t => t.suit === tile.suit && t.num === tile.num).length;
-    const fullHandRon = [...p.hand, tile];
+    const fullHandRon = [...p.hand, ...getMeldTiles(0), tile];
     showRon = !p.riichi && checkAgari(fullHandRon) && detectYaku(fullHandRon, p, getPlayerContext(0)).length > 0;
     showPon = !p.riichi && sameInHand >= 2;
     showMinkan = !p.riichi && sameInHand >= 3;
