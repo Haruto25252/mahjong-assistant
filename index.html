@@ -2005,12 +2005,12 @@ function handleRyuukyoku() {
 // ============================================================
 function renderTile(tile, size='lg', extra='') {
   const d = tileDisplay(tile);
-  return `<div class="tile tile-${size} ${extra}" style="${tileStyle(tile)}" onclick="discardTile(getTileById(${tile.id}))" data-id="${tile.id}"><span class="${d.color}">${d.text}</span></div>`;
+  return `<div class="tile tile-${size} ${extra}" onclick="discardTile(getTileById(${tile.id}))" data-id="${tile.id}"><span class="${d.color}">${d.text}</span></div>`;
 }
 
 function renderSmallTile(tile, size='sm') {
   const d = tileDisplay(tile);
-  return `<div class="tile tile-${size}" style="${tileStyle(tile)}"><span class="${d.color}">${d.text}</span></div>`;
+  return `<div class="tile tile-${size}"><span class="${d.color}">${d.text}</span></div>`;
 }
 
 function renderTileText(tile) { return tileDisplay(tile).text; }
@@ -2045,7 +2045,7 @@ function renderPlayerHand() {
 
   let html = '';
   for (const t of hand) html += renderTile(t, 'lg', '');
-  if (tsumo) html += renderTile(tsumo, 'lg', G.pendingRiichi ? 'tsumo pending-riichi' : 'tsumo');
+  if (G.tsumoTile) html += renderTile(G.tsumoTile, 'lg', G.pendingRiichi ? 'tsumo pending-riichi' : 'tsumo');
   document.getElementById('playerHand').innerHTML = html;
 
   document.getElementById('tenpaiIndicator').classList.toggle('hidden', sh !== -1);
@@ -2219,7 +2219,7 @@ function renderCandidates() {
     const d = c.display;
     return `<div class="candidate-item ${isBest?'best':''}" onclick="highlightCandidate(${c.tile.id})">
       <div class="candidate-rank ${isBest?'best':''}">${isBest?'★':i+1}</div>
-      <div><div class="tile tile-sm" style="${tileStyle(c.tile)}"><span class="${c.display.color}">${c.display.text}</span></div></div>
+      <div><div class="tile tile-sm"><span class="${c.display.color}">${c.display.text}</span></div></div>
       <div class="candidate-info">
         <div class="candidate-shanten">${shantenText}</div>
         <div class="candidate-yaku">${c.yaku.map(y=>y.name).join('・')||'役なし'}</div>
@@ -2257,7 +2257,7 @@ function showResultModal(hand, yaku, han, fu, type, loser) {
   let hanLabel = yakuman||totalHan>=13 ? '役満' : totalHan>=11?'三倍満':totalHan>=8?'倍満':totalHan>=6?'跳満':totalHan>=5?'満貫':`${totalHan}翻${fu}符`;
   showModal(type, `<div class="result-display">
     <div class="result-type">${type}</div>
-    <div class="result-hand-display">${sortTiles(hand).map(t=>{const d=tileDisplay(t);return`<div class="tile tile-md" style="${tileStyle(t)}"><span class="${d.color}">${d.text}</span></div>`;}).join('')}</div>
+    <div class="result-hand-display">${sortTiles(hand).map(t=>{const d=tileDisplay(t);return`<div class="tile tile-md"><span class="${d.color}">${d.text}</span></div>`;}).join('')}</div>
     <div class="result-yaku-list">${yaku.map(y=>`<div class="result-yaku-item"><span>${y.name}</span><span style="color:var(--gold)">${y.han>=13?'役満':y.han+'翻'}</span></div>`).join('')}</div>
     <div class="result-fu">${hanLabel}</div>
     <div class="result-total">+${pts.toLocaleString()}点</div>
@@ -2387,7 +2387,7 @@ function tryDecomposeNormal(tiles) {
 
 function renderDecomposition(decomp) {
   if (!decomp) return '';
-  const tileXS = t => { const d=tileDisplay(t); return `<div class="tile tile-xs" style="${tileStyle(t)}"><span class="${d.color}">${d.text}</span></div>`; };
+  const tileXS = t => { const d=tileDisplay(t); return `<div class="tile tile-xs"><span class="${d.color}">${d.text}</span></div>`; };
   if (decomp.type === 'kokushi') return '<div style="font-size:0.7rem;color:rgba(232,224,208,0.5)">国士無双</div>';
   if (decomp.type === 'chiitoitsu') {
     return `<div class="decomp-display">${decomp.pairs.map(pair =>
@@ -2416,7 +2416,7 @@ function showCandidateDetail(tileId, event) {
 
   const handHTML = `<div class="detail-section">
     <div class="detail-title">捨てた後の手牌</div>
-    <div class="hand-example">${sortTiles(remaining).map(t => {const d=tileDisplay(t);return`<div class="tile tile-sm" style="${tileStyle(t)}"><span class="${d.color}">${d.text}</span></div>`;}).join('')}</div>
+    <div class="hand-example">${sortTiles(remaining).map(t => {const d=tileDisplay(t);return`<div class="tile tile-sm"><span class="${d.color}">${d.text}</span></div>`;}).join('')}</div>
   </div>`;
 
   const shantenHTML = `<div class="detail-section">
@@ -2466,7 +2466,7 @@ function showCandidateDetail(tileId, event) {
         <div class="wait-analysis">${waitDetails.map(wd => `
           <div class="wait-analysis-item">
             <div class="wait-analysis-header">
-              <div class="tile tile-sm" style="${tileStyle(wd.tile)}"><span class="${wd.display.color}">${wd.display.text}</span></div>
+              <div class="tile tile-sm"><span class="${wd.display.color}">${wd.display.text}</span></div>
               <div class="wait-analysis-score">
                 ${wd.yakuList.length > 0
                   ? `<span class="wait-han-label">${wd.hanLabel}</span><span class="wait-pts">+${wd.pts.toLocaleString()}点</span>`
