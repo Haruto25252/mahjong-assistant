@@ -522,6 +522,19 @@ body.layout-mobile .tile-md { width:26px; height:36px; }
   display:flex; align-items:flex-end; gap:3px; flex-wrap:wrap;
 }
 
+.hand-and-melds-row {
+  display:flex; align-items:flex-end; gap:10px; flex-wrap:wrap;
+}
+
+.player-melds { display:flex; gap:6px; align-items:flex-end; flex-wrap:wrap; }
+.meld-group {
+  display:inline-flex; flex-direction:column; align-items:center; gap:2px;
+  padding:3px 5px; background:rgba(255,255,255,0.07);
+  border:1px solid rgba(200,168,75,0.35); border-radius:4px;
+}
+.meld-tiles { display:flex; gap:1px; }
+.meld-label { font-size:0.58rem; color:var(--gold); text-align:center; }
+
 .discard-zone {
   background:rgba(0,0,0,0.2); border-radius:5px;
   padding:6px; margin-top:6px;
@@ -969,7 +982,10 @@ body.search-mode *::selection {
           </div>
           <div class="player-score-display" id="playerScore">25000点</div>
         </div>
-        <div class="hand-container" id="playerHand"></div>
+        <div class="hand-and-melds-row">
+          <div class="hand-container" id="playerHand"></div>
+          <div class="player-melds" id="playerMelds"></div>
+        </div>
         <div class="discard-zone" style="margin-top:6px;">
           <div class="discard-label">捨て牌</div>
           <div class="discard-tiles" id="playerDiscard"></div>
@@ -1510,10 +1526,15 @@ function drawTile(playerIdx) {
   G.turnCount++;
 }
 
+function getMeldTiles(playerIdx) {
+  return G.players[playerIdx].melds.flatMap(m => m.tiles);
+}
+
 function getPlayerHand(playerIdx) {
   const p = G.players[playerIdx];
-  if (playerIdx === 0 && G.tsumoTile) return [...p.hand, G.tsumoTile];
-  return [...p.hand];
+  const meldTiles = getMeldTiles(playerIdx);
+  if (playerIdx === 0 && G.tsumoTile) return [...p.hand, ...meldTiles, G.tsumoTile];
+  return [...p.hand, ...meldTiles];
 }
 
 // ============================================================
@@ -1799,18 +1820,18 @@ function calcFu(tiles, context) {
 // CANDIDATES
 // ============================================================
 function analyzeCandidates(playerIdx) {
-  const hand = G.players[playerIdx].hand;
-  const tsumo = G.tsumoTile;
-  const fullHand = tsumo ? [...hand, tsumo] : [...hand];
+  const p = G.players[playerIdx];
+  const meldTiles = getMeldTiles(playerIdx);
+  const discardable = G.tsumoTile ? [...p.hand, G.tsumoTile] : [...p.hand];
   const candidates = []; const seen = new Set();
-  for (const tile of fullHand) {
+  for (const tile of discardable) {
     const key = tileKey(tile);
     if (seen.has(key)) continue; seen.add(key);
     let removed = false;
-    const remaining = fullHand.filter(t => { if (!removed && t.id===tile.id) { removed=true; return false; } return true; });
+    const remaining = [...discardable, ...meldTiles].filter(t => { if (!removed && t.id===tile.id) { removed=true; return false; } return true; });
     const shanten = calcShanten(remaining);
     const context = getPlayerContext(playerIdx);
-    const yaku = shanten === -1 ? detectYaku(remaining, G.players[playerIdx], context) : [];
+    const yaku = shanten === -1 ? detectYaku(remaining, p, context) : [];
     candidates.push({ tile, shanten, yaku, display: tileDisplay(tile) });
   }
   candidates.sort((a,b) => a.shanten-b.shanten || a.tile.suit.localeCompare(b.tile.suit) || a.tile.num-b.tile.num);
@@ -1902,7 +1923,7 @@ function discardTile(tile) {
   if (G.phase !== 'player_draw' && G.phase !== 'discard' && G.phase !== 'draw') return;
   const p = G.players[0];
   if (G.pendingRiichi) {
-    const remaining = (G.tsumoTile ? [...p.hand, G.tsumoTile] : [...p.hand]).filter(t => t.id !== tile.id);
+    const remaining = [...p.hand, ...getMeldTiles(0), ...(G.tsumoTile ? [G.tsumoTile] : [])].filter(t => t.id !== tile.id);
     if (calcShanten(remaining) !== -1) {
       showNotification('テンパイを崩す牌は捨てられません！テンパイを維持できる牌を選んでください'); return;
     }
@@ -2021,6 +2042,7 @@ function checkPlayerReactions() {
 }
 
 function canDeclareRiichi(p) {
+  if (p.melds.length > 0) return false;
   const fullHand = G.tsumoTile ? [...p.hand, G.tsumoTile] : [...p.hand];
   if (fullHand.length !== 14) return false;
   for (let i = 0; i < fullHand.length; i++) {
@@ -2148,10 +2170,22 @@ function updateUI() {
   document.getElementById('honbaDisplay').textContent = `本場:${G.honba} / R棒:${G.riichiPot/1000}`;
 }
 
+function renderPlayerMelds() {
+  const p = G.players[0];
+  const labels = { pon: 'ポン', minkan: '大明槓', ankan: '暗カン' };
+  const html = p.melds.map(meld => {
+    const tiles = meld.tiles.map(t => renderSmallTile(t, 'sm')).join('');
+    return `<div class="meld-group"><div class="meld-tiles">${tiles}</div><div class="meld-label">${labels[meld.type] || meld.type}</div></div>`;
+  }).join('');
+  const el = document.getElementById('playerMelds');
+  if (el) el.innerHTML = html;
+}
+
 function renderPlayerHand() {
   const p = G.players[0];
+  const meldTiles = getMeldTiles(0);
   const hand = sortTiles(p.hand);
-  const sh = calcShanten([...p.hand]);
+  const sh = calcShanten([...p.hand, ...meldTiles]);
 
   let html = '';
   for (const t of hand) html += renderTile(t, 'lg', '');
@@ -2163,6 +2197,7 @@ function renderPlayerHand() {
   document.getElementById('playerDiscard').innerHTML = p.discards.map(t=>renderSmallTile(t,'sm')).join('');
   document.getElementById('playerScore').textContent = p.score.toLocaleString() + '点';
   document.getElementById('playerWind').textContent = p.wind;
+  renderPlayerMelds();
 }
 
 function renderCpuPlayers() {
@@ -2260,7 +2295,7 @@ function renderRiichiPanel() {
   panel.classList.remove('hidden');
 
   // Always show waiting tiles in the header
-  const hand13 = [...p.hand];
+  const hand13 = [...p.hand, ...getMeldTiles(0)];
   const waits = [];
   for (const suit of ['man', 'pin', 'sou']) {
     for (let n = 1; n <= 9; n++) {
