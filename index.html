@@ -578,6 +578,8 @@ body.layout-mobile .action-btn {
 .action-riichi:hover{background:var(--gold);color:var(--green);}
 .action-skip{border-color:rgba(232,224,208,0.4);color:rgba(232,224,208,0.4);}
 .action-skip:hover{background:rgba(232,224,208,0.1);}
+.action-kita{border-color:#27ae60;color:#27ae60;}
+.action-kita:hover{background:rgba(39,174,96,0.15);}
 .action-btn:disabled{opacity:0.35;cursor:not-allowed;pointer-events:none;}
 
 .tile.pending-riichi {
@@ -1009,6 +1011,7 @@ body.search-mode *::selection {
       <button class="action-btn action-pon" id="btnPon" onclick="declarePon()" style="display:none">ポン</button>
       <button class="action-btn action-kan" id="btnKan" onclick="declareKan()" style="display:none">カン</button>
       <button class="action-btn action-skip" id="btnSkip" onclick="skipAction()" style="display:none">スキップ</button>
+      <button class="action-btn action-kita" id="btnKita" onclick="declareKita()" style="display:none">北抜き</button>
     </div>
 
     <!-- Riichi info panel -->
@@ -1489,7 +1492,7 @@ function initGame() {
   const players = [];
   for (let i = 0; i < playerCount; i++) {
     players.push({
-      hand: [], discards: [], melds: [],
+      hand: [], discards: [], melds: [], kitaCount: 0,
       score: 25000, riichi: false, riichiTurn: -1,
       isPlayer: i === 0,
       name: i === 0 ? 'あなた' : ['対面','上家','下家'][i-1],
@@ -1710,6 +1713,9 @@ function detectYaku(tiles, playerState, context) {
 
   if (riichi) yaku.push({ name:'リーチ', han:1 });
   if (tsumo && isClosed) yaku.push({ name:'門前清自摸和', han:1 });
+  if (gameType === 3 && playerState.kitaCount > 0) {
+    yaku.push({ name:`北抜き×${playerState.kitaCount}`, han: playerState.kitaCount });
+  }
 
   const hasTerminal = tiles.some(t => t.suit === 'jihai' || t.num === 1 || t.num === 9);
   if (!hasTerminal) yaku.push({ name:'断幺九', han:1 });
@@ -1836,9 +1842,19 @@ function analyzeCandidates(playerIdx) {
     const shanten = calcShanten(remaining);
     const context = getPlayerContext(playerIdx);
     const yaku = shanten === -1 ? detectYaku(remaining, p, context) : [];
-    candidates.push({ tile, shanten, yaku, display: tileDisplay(tile) });
+    // 三麻補正：捨てた後に残る孤立1マン・9マンにペナルティ（捨てる優先度を下げる）
+    let sortScore = shanten;
+    if (gameType === 3) {
+      const manCounts = {};
+      for (const t of remaining) {
+        if (t.suit === 'man') manCounts[t.num] = (manCounts[t.num] || 0) + 1;
+      }
+      if ((manCounts[1] || 0) === 1) sortScore += 0.4;
+      if ((manCounts[9] || 0) === 1) sortScore += 0.4;
+    }
+    candidates.push({ tile, shanten, sortScore, yaku, display: tileDisplay(tile) });
   }
-  candidates.sort((a,b) => a.shanten-b.shanten || a.tile.suit.localeCompare(b.tile.suit) || a.tile.num-b.tile.num);
+  candidates.sort((a,b) => a.sortScore-b.sortScore || a.tile.suit.localeCompare(b.tile.suit) || a.tile.num-b.tile.num);
   return candidates.slice(0, 6);
 }
 
@@ -2055,6 +2071,25 @@ function canDeclareRiichi(p) {
     if (calcShanten(remaining) === -1) return true;
   }
   return false;
+}
+
+function declareKita() {
+  if (G.phase !== 'player_draw' || gameType !== 3) return;
+  const p = G.players[0];
+  const allTiles = G.tsumoTile ? [...p.hand, G.tsumoTile] : [...p.hand];
+  const kitaTile = allTiles.find(t => t.suit === 'jihai' && t.num === 4);
+  if (!kitaTile) { showNotification('北牌がありません'); return; }
+  if (G.tsumoTile && kitaTile.id === G.tsumoTile.id) {
+    G.tsumoTile = null;
+  } else {
+    const idx = p.hand.findIndex(t => t.id === kitaTile.id);
+    p.hand.splice(idx, 1);
+  }
+  p.kitaCount++;
+  addLog(`北抜き！（${p.kitaCount}枚目）`, 'player');
+  if (G.yama.length === 0) { handleRyuukyoku(); return; }
+  G.tsumoTile = G.yama.pop();
+  updateUI();
 }
 
 function declareChi() { showNotification('チーはこのゲームでは使えません'); }
@@ -2292,6 +2327,10 @@ function renderActionButtons() {
   for (const t of fullHand14) { const k = tileKey(t); handCounts[k] = (handCounts[k] || 0) + 1; }
   const showAnkan = isPlayerTurn && !!G.tsumoTile && !p.riichi && Object.values(handCounts).some(c => c >= 4);
 
+  // 北抜き check (三麻のみ)
+  const allTilesForKita = isPlayerTurn ? [...p.hand, ...(G.tsumoTile ? [G.tsumoTile] : [])] : [];
+  const showKita = gameType === 3 && isPlayerTurn && allTilesForKita.some(t => t.suit === 'jihai' && t.num === 4);
+
   // cpu_discard reaction checks
   let showRon = false, showPon = false, showMinkan = false;
   if (isCpuDiscard && G.lastDiscard) {
@@ -2315,8 +2354,9 @@ function renderActionButtons() {
   show('btnPon', showPon);
   show('btnKan', showAnkan || showMinkan);
   show('btnSkip', isCpuDiscard);
+  show('btnKita', showKita);
 
-  const anyVisible = showTsumo || showRiichi || showRon || showPon || showAnkan || showMinkan || isCpuDiscard;
+  const anyVisible = showTsumo || showRiichi || showRon || showPon || showAnkan || showMinkan || showKita || isCpuDiscard;
   document.getElementById('actionBar').style.display = anyVisible ? '' : 'none';
 
   document.getElementById('statusMsg').textContent =
